@@ -38,7 +38,12 @@ If `mongosh` works, you're connected! Type `exit` to quit.
 If you have Docker installed:
 
 ```powershell
-docker run -d -p 27017:27017 --name mongodb mongo:latest
+# Start MongoDB as replica set (required for Prisma)
+docker run -d -p 27017:27017 --name mongodb mongo:latest mongod --replSet rs0
+
+# Initialize replica set
+Start-Sleep -Seconds 5
+docker exec -it mongodb mongosh --eval "rs.initiate({_id:'rs0',members:[{_id:0,host:'localhost:27017'}]})"
 ```
 
 ## Option 3: Use MongoDB Atlas (Cloud - Free Tier)
@@ -49,12 +54,59 @@ docker run -d -p 27017:27017 --name mongodb mongo:latest
 4. Get your connection string
 5. Update `.env` file with the Atlas connection string
 
+## ⚠️ IMPORTANT: Configure MongoDB as Replica Set (Required for Prisma)
+
+**Prisma requires MongoDB to run as a replica set**, even for single-node development. Follow these steps:
+
+### Quick Setup (Docker - Recommended for Development):
+
+```powershell
+# Stop existing MongoDB if running
+docker stop mongodb 2>$null
+docker rm mongodb 2>$null
+
+# Start MongoDB as replica set
+docker run -d -p 27017:27017 --name mongodb mongo:latest mongod --replSet rs0
+
+# Wait a few seconds, then initialize replica set
+Start-Sleep -Seconds 5
+docker exec -it mongodb mongosh --eval "rs.initiate({_id:'rs0',members:[{_id:0,host:'localhost:27017'}]})"
+```
+
+### Manual Setup (Windows Service):
+
+1. Stop MongoDB service:
+```powershell
+Stop-Service MongoDB
+```
+
+2. Edit MongoDB config file (usually at `C:\Program Files\MongoDB\Server\<version>\bin\mongod.cfg`):
+```yaml
+replication:
+  replSetName: rs0
+```
+
+3. Start MongoDB service:
+```powershell
+Start-Service MongoDB
+```
+
+4. Initialize replica set:
+```powershell
+mongosh --eval "rs.initiate({_id:'rs0',members:[{_id:0,host:'localhost:27017'}]})"
+```
+
+5. Verify:
+```powershell
+mongosh --eval "rs.status()"
+```
+
 ## Configure Backend
 
-Once MongoDB is running, update your `.env` file:
+Once MongoDB is running as a replica set, update your `.env` file:
 
 ```env
-DATABASE_URL="mongodb://localhost:27017/sukiyarestaurant?retryWrites=true&w=majority"
+DATABASE_URL="mongodb://localhost:27017/sukiyarestaurant?retryWrites=true&w=majority&replicaSet=rs0"
 ```
 
 ## Start MongoDB Service (if installed but not running)
