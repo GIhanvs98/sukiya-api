@@ -40,6 +40,7 @@ app.use('/api/*', (req, res) => {
       'GET /api/orders',
       'PATCH /api/orders/:id/status',
       'GET /api/users',
+      'POST /api/users',
       'PATCH /api/users/:id',
       'DELETE /api/users/:id'
     ]
@@ -70,6 +71,7 @@ async function startServer() {
       console.log(`   GET    /api/orders`);
       console.log(`   PATCH  /api/orders/:id/status`);
       console.log(`   GET    /api/users`);
+      console.log(`   POST   /api/users`);
       console.log(`   PATCH  /api/users/:id`);
       console.log(`   DELETE /api/users/:id`);
     });
