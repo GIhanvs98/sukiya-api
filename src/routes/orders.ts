@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { prisma } from '../config/database';
+import { prisma, getMongoDb } from '../config/database';
 import { ObjectId } from 'mongodb';
 
 const router = Router();
@@ -23,6 +23,7 @@ router.get('/', async (req, res) => {
     // Transform to match frontend format
     const transformedOrders = orders.map((order) => ({
       _id: order.id,
+      id: order.id, // Include both id and _id for consistency
       orderId: order.orderId,
       userId: order.userId,
       displayName: order.displayName,
@@ -60,47 +61,62 @@ router.patch('/:id/status', async (req, res) => {
       return res.status(400).json({ error: 'Invalid status value' });
     }
 
-    const order = await prisma.order.update({
-      where: { id },
-      data: { status },
-      include: {
-        items: {
-          include: {
-            item: true,
-          },
-        },
+    // Use native MongoDB driver for writes (no replica set required)
+    const db = await getMongoDb();
+    const orderObjectId = new ObjectId(id);
+    
+    const result = await db.collection('orders').findOneAndUpdate(
+      { _id: orderObjectId },
+      { 
+        $set: { 
+          status: status,
+          updatedAt: new Date()
+        } 
       },
-    });
+      { returnDocument: 'after' }
+    );
+
+    if (!result) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    // Fetch order items using native MongoDB driver
+    const orderItems = await db.collection('order_items').find({
+      orderId: orderObjectId
+    }).toArray();
 
     // Transform to match frontend format
     const transformedOrder = {
-      _id: order.id,
-      orderId: order.orderId,
-      userId: order.userId,
-      displayName: order.displayName,
-      tableNumber: order.tableNumber,
-      items: order.items.map((item) => ({
-        itemId: item.itemId,
+      _id: result._id.toString(),
+      id: result._id.toString(), // Include both id and _id for consistency
+      orderId: result.orderId,
+      userId: result.userId,
+      displayName: result.displayName,
+      tableNumber: result.tableNumber,
+      items: orderItems.map((item) => ({
+        itemId: item.itemId.toString(),
         name: item.name,
         quantity: item.quantity,
         price: item.price,
       })),
-      total: order.total,
-      status: order.status,
-      createdAt: order.createdAt.toISOString(),
-      updatedAt: order.updatedAt.toISOString(),
+      total: result.total,
+      status: result.status,
+      createdAt: result.createdAt.toISOString(),
+      updatedAt: result.updatedAt.toISOString(),
     };
 
     res.json(transformedOrder);
   } catch (error: any) {
     console.error('Error updating order status:', error);
-    if (error.code === 'P2025') {
-      return res.status(404).json({ error: 'Order not found' });
-    }
-    res.status(500).json({ error: 'Failed to update order status' });
+    res.status(500).json({ 
+      error: 'Failed to update order status',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
 export default router;
+
+
 
 
