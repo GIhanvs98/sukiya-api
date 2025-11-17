@@ -16,7 +16,14 @@ router.get('/', async (req, res) => {
       },
     });
 
-    res.json(menuItems);
+    // Normalize response to include _id field (Prisma uses 'id' by default)
+    const normalizedItems = menuItems.map((item: any) => ({
+      ...item,
+      _id: item.id || item._id,
+      id: item.id || item._id,
+    }));
+
+    res.json(normalizedItems);
   } catch (error) {
     console.error('Error fetching menu items:', error);
     res.status(500).json({ error: 'Failed to fetch menu items' });
