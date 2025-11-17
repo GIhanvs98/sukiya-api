@@ -12,7 +12,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "seed": "tsx src/scripts/seed.ts",
-    "seed:orders": "tsx src/scripts/seedOrders.ts"
+    "seed:orders": "tsx src/scripts/seedOrders.ts",
+    "seed:users": "tsx src/scripts/seedUsers.ts"
   },
   "keywords": [
     "line",
