@@ -6,6 +6,7 @@ import { validateLineConfig } from './config/line';
 import menuRoutes from './routes/menu';
 import orderRoutes from './routes/orders';
 import userRoutes from './routes/users';
+import authRoutes from './routes/auth';
 
 dotenv.config();
 
@@ -24,6 +25,7 @@ app.get('/health', (req, res) => {
 app.use('/api/menu', menuRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/auth', authRoutes);
 
 // 404 handler for API routes
 app.use('/api/*', (req, res) => {
@@ -42,7 +44,10 @@ app.use('/api/*', (req, res) => {
       'GET /api/users',
       'POST /api/users',
       'PATCH /api/users/:id',
-      'DELETE /api/users/:id'
+      'DELETE /api/users/:id',
+      'POST /api/auth/login',
+      'POST /api/auth/verify',
+      'POST /api/auth/set-password'
     ]
   });
 });
@@ -74,6 +79,9 @@ async function startServer() {
       console.log(`   POST   /api/users`);
       console.log(`   PATCH  /api/users/:id`);
       console.log(`   DELETE /api/users/:id`);
+      console.log(`   POST   /api/auth/login`);
+      console.log(`   POST   /api/auth/verify`);
+      console.log(`   POST   /api/auth/set-password`);
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);
