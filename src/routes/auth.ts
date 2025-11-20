@@ -22,9 +22,10 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Find user by userId
-    const user = await prisma.user.findUnique({
-      where: { userId: userId.trim() },
+    // Find user by userId using native MongoDB driver to get password field
+    const db = await getMongoDb();
+    const user = await db.collection('users').findOne({
+      userId: userId.trim()
     });
 
     if (!user) {
@@ -70,16 +71,16 @@ router.post('/login', async (req, res) => {
     res.json({
       token,
       user: {
-        _id: user.id,
-        id: user.id,
+        _id: user._id.toString(),
+        id: user._id.toString(),
         userId: user.userId,
         displayName: user.displayName,
-        email: user.email,
-        phone: user.phone,
+        email: user.email || undefined,
+        phone: user.phone || undefined,
         role: user.role.toLowerCase(),
         isActive: user.isActive,
-        createdAt: user.createdAt.toISOString(),
-        updatedAt: user.updatedAt.toISOString(),
+        createdAt: user.createdAt instanceof Date ? user.createdAt.toISOString() : new Date(user.createdAt).toISOString(),
+        updatedAt: user.updatedAt instanceof Date ? user.updatedAt.toISOString() : new Date(user.updatedAt).toISOString(),
       },
     });
   } catch (error: any) {
