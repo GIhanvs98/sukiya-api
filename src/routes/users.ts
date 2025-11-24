@@ -215,7 +215,7 @@ router.patch('/:id', async (req, res) => {
   }
 });
 
-// DELETE /api/users/:id - Soft delete user
+// DELETE /api/users/:id - Hard delete user (admin only)
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -226,17 +226,15 @@ router.delete('/:id', async (req, res) => {
 
     // Use native MongoDB driver for writes
     const db = await getMongoDb();
-    const result = await db.collection('users').findOneAndUpdate(
-      { _id: new ObjectId(id) },
-      { $set: { isActive: false, updatedAt: new Date() } },
-      { returnDocument: 'after' }
+    const result = await db.collection('users').findOneAndDelete(
+      { _id: new ObjectId(id) }
     );
 
     if (!result) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json({ message: 'User deleted successfully', userId: result.userId });
+    res.json({ message: 'User deleted successfully' });
   } catch (error: any) {
     console.error('Error deleting user:', error);
     res.status(500).json({ 
