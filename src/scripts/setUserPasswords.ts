@@ -26,6 +26,16 @@ async function setUserPasswords() {
         password: 'manager123',
         role: 'Manager',
       },
+      {
+        userId: 'staff001',
+        password: 'staff123',
+        role: 'Manager', // Note: Staff can't login, but we'll set password anyway
+      },
+      {
+        userId: 'staff002',
+        password: 'staff123',
+        role: 'Manager', // Note: Staff can't login, but we'll set password anyway
+      },
     ];
     
     // Also create additional test users if they don't exist
@@ -43,6 +53,13 @@ async function setUserPasswords() {
         email: 'manager@restaurant.com',
         role: 'Manager',
         password: 'manager123',
+      },
+      {
+        userId: 'staff',
+        displayName: 'Staff User',
+        email: 'staff@restaurant.com',
+        role: 'Staff',
+        password: 'staff123',
       },
     ];
     
@@ -90,7 +107,7 @@ async function setUserPasswords() {
       }
     }
     
-    // Set passwords for existing users
+    // Set passwords for existing users (including staff)
     for (const userPassword of userPasswords) {
       const user = await db.collection('users').findOne({
         userId: userPassword.userId
@@ -107,10 +124,28 @@ async function setUserPasswords() {
             } 
           }
         );
-        console.log(`✅ Set password for: ${userPassword.userId} (${userPassword.role}) - Password: ${userPassword.password}`);
+        console.log(`✅ Set password for: ${userPassword.userId} (${user.role}) - Password: ${userPassword.password}`);
       } else {
         console.log(`⚠️  User ${userPassword.userId} not found, skipping...`);
       }
+    }
+    
+    // Also set password for staff user if created above
+    const staffUser = await db.collection('users').findOne({
+      userId: 'staff'
+    });
+    if (staffUser) {
+      const hashedPassword = await bcrypt.hash('staff123', 10);
+      await db.collection('users').updateOne(
+        { _id: staffUser._id },
+        { 
+          $set: { 
+            password: hashedPassword,
+            updatedAt: new Date()
+          } 
+        }
+      );
+      console.log(`✅ Set password for: staff (Staff) - Password: staff123`);
     }
     
     console.log('\n🎉 Password setup complete!');
@@ -124,6 +159,11 @@ async function setUserPasswords() {
     console.log('   Username: manager');
     console.log('   Password: manager123');
     console.log('');
+    console.log('👤 STAFF USER (Cannot login to admin panel):');
+    console.log('   Username: staff');
+    console.log('   Password: staff123');
+    console.log('   Note: Staff role cannot access admin login');
+    console.log('');
     console.log('👤 ALTERNATIVE ADMIN:');
     console.log('   Username: admin001');
     console.log('   Password: admin123');
@@ -131,6 +171,12 @@ async function setUserPasswords() {
     console.log('👤 ALTERNATIVE MANAGER:');
     console.log('   Username: manager001');
     console.log('   Password: manager123');
+    console.log('');
+    console.log('👤 ALTERNATIVE STAFF (Cannot login):');
+    console.log('   Username: staff001');
+    console.log('   Password: staff123');
+    console.log('   Username: staff002');
+    console.log('   Password: staff123');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     
     process.exit(0);
