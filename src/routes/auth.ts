@@ -37,9 +37,9 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Account is inactive' });
     }
 
-    // Check if user has admin role
-    if (user.role !== 'Admin' && user.role !== 'Manager') {
-      return res.status(403).json({ error: 'Access denied. Admin or Manager role required' });
+    // Check if user has admin, manager, or staff role
+    if (user.role !== 'Admin' && user.role !== 'Manager' && user.role !== 'Staff') {
+      return res.status(403).json({ error: 'Access denied. Admin, Manager, or Staff role required' });
     }
 
     // Check if user has a password set
@@ -166,9 +166,9 @@ router.post('/set-password', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Check if user has admin role
-    if (user.role !== 'Admin' && user.role !== 'Manager') {
-      return res.status(403).json({ error: 'Access denied. Admin or Manager role required' });
+    // Check if user has admin, manager, or staff role
+    if (user.role !== 'Admin' && user.role !== 'Manager' && user.role !== 'Staff') {
+      return res.status(403).json({ error: 'Access denied. Admin, Manager, or Staff role required' });
     }
 
     // Hash password
