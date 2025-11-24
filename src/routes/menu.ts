@@ -4,13 +4,18 @@ import { ObjectId } from 'mongodb';
 
 const router = Router();
 
-// GET /api/menu - Get all active menu items
+// GET /api/menu - Get menu items (all items for admin, only active for public)
 router.get('/', async (req, res) => {
   try {
+    // Check if request has authorization header (admin request)
+    const authHeader = req.headers.authorization;
+    const isAdminRequest = authHeader && authHeader.startsWith('Bearer ');
+
+    // For admin requests, return all items. For public requests, return only active items.
+    const whereClause = isAdminRequest ? {} : { isActive: true };
+
     const menuItems = await prisma.menuItem.findMany({
-      where: {
-        isActive: true,
-      },
+      where: whereClause,
       orderBy: {
         createdAt: 'desc',
       },
@@ -238,7 +243,7 @@ router.patch('/:id', async (req, res) => {
   }
 });
 
-// DELETE /api/menu/:id - Soft delete a menu item
+// DELETE /api/menu/:id - Hard delete a menu item (admin only)
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -249,31 +254,15 @@ router.delete('/:id', async (req, res) => {
 
     // Use native MongoDB driver for writes (no replica set required)
     const db = await getMongoDb();
-    const result = await db.collection('menu_items').findOneAndUpdate(
-      { _id: new ObjectId(id) },
-      { $set: { isActive: false, updatedAt: new Date() } },
-      { returnDocument: 'after' }
+    const result = await db.collection('menu_items').findOneAndDelete(
+      { _id: new ObjectId(id) }
     );
 
     if (!result) {
       return res.status(404).json({ error: 'Menu item not found' });
     }
 
-    // Convert to Prisma format for response
-    const menuItem = {
-      id: result._id.toString(),
-      _id: result._id.toString(),
-      nameEn: result.nameEn,
-      nameJp: result.nameJp,
-      price: result.price,
-      imageUrl: result.imageUrl,
-      category: result.category,
-      isActive: result.isActive,
-      createdAt: result.createdAt,
-      updatedAt: result.updatedAt,
-    };
-
-    res.json({ message: 'Menu item deleted successfully', menuItem });
+    res.json({ message: 'Menu item deleted successfully' });
   } catch (error: any) {
     console.error('Error deleting menu item:', error);
     res.status(500).json({ error: 'Failed to delete menu item' });
