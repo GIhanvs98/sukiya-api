@@ -1,57 +1,135 @@
 import { Router } from 'express';
-import { prisma } from '../config/database';
+import { prisma, getMongoDb } from '../config/database';
 import { ObjectId } from 'mongodb';
 
 const router = Router();
 
-// GET /api/users - Get all users (aggregated from orders)
+// GET /api/users - Get all users
 router.get('/', async (req, res) => {
   try {
-    // Get unique users from orders
-    const orders = await prisma.order.findMany({
-      select: {
-        userId: true,
-        displayName: true,
-        total: true,
-        createdAt: true,
-      },
+    // Get users from database
+    const users = await prisma.user.findMany({
       orderBy: {
         createdAt: 'desc',
       },
     });
 
-    // Aggregate user data
-    const userMap = new Map<string, any>();
+    // Also aggregate order data to update stats
+    const orders = await prisma.order.findMany({
+      select: {
+        userId: true,
+        total: true,
+        createdAt: true,
+      },
+    });
 
+    // Calculate stats per user
+    const userStats = new Map<string, { totalOrders: number; totalSpent: number; lastOrderDate?: Date }>();
     orders.forEach((order) => {
-      if (!userMap.has(order.userId)) {
-        userMap.set(order.userId, {
-          _id: order.userId,
-          userId: order.userId,
-          displayName: order.displayName,
-          role: 'customer' as const,
-          totalOrders: 0,
-          totalSpent: 0,
-          lastOrderDate: order.createdAt.toISOString(),
-          createdAt: order.createdAt.toISOString(),
-          updatedAt: order.createdAt.toISOString(),
-          isActive: true,
-        });
+      if (!userStats.has(order.userId)) {
+        userStats.set(order.userId, { totalOrders: 0, totalSpent: 0 });
       }
-
-      const user = userMap.get(order.userId)!;
-      user.totalOrders += 1;
-      user.totalSpent += order.total;
-      if (order.createdAt > new Date(user.lastOrderDate)) {
-        user.lastOrderDate = order.createdAt.toISOString();
+      const stats = userStats.get(order.userId)!;
+      stats.totalOrders += 1;
+      stats.totalSpent += order.total;
+      if (!stats.lastOrderDate || order.createdAt > stats.lastOrderDate) {
+        stats.lastOrderDate = order.createdAt;
       }
     });
 
-    const users = Array.from(userMap.values());
-    res.json(users);
+    // Merge user data with stats
+    const usersWithStats = users.map((user) => {
+      const stats = userStats.get(user.userId) || { totalOrders: 0, totalSpent: 0 };
+      return {
+        _id: user.id,
+        id: user.id,
+        userId: user.userId,
+        displayName: user.displayName,
+        email: user.email,
+        phone: user.phone,
+        role: user.role.toLowerCase() as string,
+        totalOrders: stats.totalOrders,
+        totalSpent: stats.totalSpent,
+        lastOrderDate: stats.lastOrderDate?.toISOString(),
+        createdAt: user.createdAt.toISOString(),
+        updatedAt: user.updatedAt.toISOString(),
+        isActive: user.isActive,
+      };
+    });
+
+    res.json(usersWithStats);
   } catch (error) {
     console.error('Error fetching users:', error);
     res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+// POST /api/users - Create a new user
+router.post('/', async (req, res) => {
+  try {
+    const { userId, displayName, email, phone, role } = req.body;
+
+    // Validate required fields
+    if (!userId || !displayName) {
+      return res.status(400).json({ 
+        error: 'Missing required fields',
+        missingFields: !userId ? ['userId'] : ['displayName']
+      });
+    }
+
+    // Check if user already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { userId },
+    });
+
+    if (existingUser) {
+      return res.status(409).json({ error: 'User with this userId already exists' });
+    }
+
+    // Use native MongoDB driver for writes
+    const db = await getMongoDb();
+    const now = new Date();
+    const userData = {
+      _id: new ObjectId(),
+      userId: userId.trim(),
+      displayName: displayName.trim(),
+      email: email?.trim() || null,
+      phone: phone?.trim() || null,
+      role: role || 'Customer',
+      totalOrders: 0,
+      totalSpent: 0,
+      lastOrderDate: null,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await db.collection('users').insertOne(userData);
+
+    // Convert to Prisma format for response
+    const user = {
+      _id: userData._id.toString(),
+      id: userData._id.toString(),
+      userId: userData.userId,
+      displayName: userData.displayName,
+      email: userData.email,
+      phone: userData.phone,
+      role: userData.role.toLowerCase(),
+      totalOrders: userData.totalOrders,
+      totalSpent: userData.totalSpent,
+      lastOrderDate: null,
+      createdAt: userData.createdAt.toISOString(),
+      updatedAt: userData.updatedAt.toISOString(),
+      isActive: userData.isActive,
+    };
+
+    res.status(201).json(user);
+  } catch (error: any) {
+    console.error('Error creating user:', error);
+    res.status(500).json({ 
+      error: 'Failed to create user',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
@@ -61,70 +139,113 @@ router.patch('/:id', async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
 
-    // For now, users are derived from orders, so we can't update them directly
-    // In a real system, you'd have a User model
-    // This is a placeholder that returns the user data
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid user ID format' });
+    }
+
+    // Use native MongoDB driver for writes
+    const db = await getMongoDb();
+    const updateData: any = {
+      updatedAt: new Date(),
+    };
+
+    if (updates.role !== undefined) {
+      updateData.role = updates.role.charAt(0).toUpperCase() + updates.role.slice(1).toLowerCase();
+    }
+    if (updates.isActive !== undefined) {
+      updateData.isActive = updates.isActive;
+    }
+    if (updates.displayName !== undefined) {
+      updateData.displayName = updates.displayName.trim();
+    }
+    if (updates.email !== undefined) {
+      updateData.email = updates.email?.trim() || null;
+    }
+    if (updates.phone !== undefined) {
+      updateData.phone = updates.phone?.trim() || null;
+    }
+
+    const result = await db.collection('users').findOneAndUpdate(
+      { _id: new ObjectId(id) },
+      { $set: updateData },
+      { returnDocument: 'after' }
+    );
+
+    if (!result) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Get order stats
     const orders = await prisma.order.findMany({
-      where: { userId: id },
+      where: { userId: result.userId },
       select: {
-        userId: true,
-        displayName: true,
         total: true,
         createdAt: true,
       },
     });
 
-    if (orders.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    // Aggregate user data
     const totalOrders = orders.length;
     const totalSpent = orders.reduce((sum, order) => sum + order.total, 0);
-    const lastOrderDate = orders[0]?.createdAt.toISOString() || new Date().toISOString();
+    const lastOrderDate = orders[0]?.createdAt || null;
 
+    // Transform to match frontend format
     const user = {
-      _id: id,
-      userId: id,
-      displayName: orders[0].displayName,
-      role: updates.role || 'customer',
+      _id: result._id.toString(),
+      id: result._id.toString(),
+      userId: result.userId,
+      displayName: result.displayName,
+      email: result.email,
+      phone: result.phone,
+      role: result.role.toLowerCase(),
       totalOrders,
       totalSpent,
-      lastOrderDate,
-      createdAt: orders[orders.length - 1]?.createdAt.toISOString() || new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      isActive: updates.isActive !== undefined ? updates.isActive : true,
+      lastOrderDate: lastOrderDate?.toISOString(),
+      createdAt: result.createdAt.toISOString(),
+      updatedAt: result.updatedAt.toISOString(),
+      isActive: result.isActive,
     };
 
     res.json(user);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating user:', error);
-    res.status(500).json({ error: 'Failed to update user' });
+    res.status(500).json({ 
+      error: 'Failed to update user',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
-// DELETE /api/users/:id - Soft delete user
+// DELETE /api/users/:id - Hard delete user (admin only)
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Since users are derived from orders, we can't actually delete them
-    // This is a placeholder that returns success
-    const orders = await prisma.order.findMany({
-      where: { userId: id },
-    });
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid user ID format' });
+    }
 
-    if (orders.length === 0) {
+    // Use native MongoDB driver for writes
+    const db = await getMongoDb();
+    const result = await db.collection('users').findOneAndDelete(
+      { _id: new ObjectId(id) }
+    );
+
+    if (!result) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json({ message: 'User marked as inactive', userId: id });
-  } catch (error) {
+    res.json({ message: 'User deleted successfully' });
+  } catch (error: any) {
     console.error('Error deleting user:', error);
-    res.status(500).json({ error: 'Failed to delete user' });
+    res.status(500).json({ 
+      error: 'Failed to delete user',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
 export default router;
+
+
 
 

@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { connectDatabase, disconnectDatabase } from './config/database';
@@ -6,6 +6,7 @@ import { validateLineConfig } from './config/line';
 import menuRoutes from './routes/menu';
 import orderRoutes from './routes/orders';
 import userRoutes from './routes/users';
+import authRoutes from './routes/auth';
 
 dotenv.config();
 
@@ -24,6 +25,7 @@ app.get('/health', (req, res) => {
 app.use('/api/menu', menuRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/auth', authRoutes);
 
 // 404 handler for API routes
 app.use('/api/*', (req, res) => {
@@ -40,8 +42,12 @@ app.use('/api/*', (req, res) => {
       'GET /api/orders',
       'PATCH /api/orders/:id/status',
       'GET /api/users',
+      'POST /api/users',
       'PATCH /api/users/:id',
-      'DELETE /api/users/:id'
+      'DELETE /api/users/:id',
+      'POST /api/auth/login',
+      'POST /api/auth/verify',
+      'POST /api/auth/set-password'
     ]
   });
 });
@@ -70,8 +76,12 @@ async function startServer() {
       console.log(`   GET    /api/orders`);
       console.log(`   PATCH  /api/orders/:id/status`);
       console.log(`   GET    /api/users`);
+      console.log(`   POST   /api/users`);
       console.log(`   PATCH  /api/users/:id`);
       console.log(`   DELETE /api/users/:id`);
+      console.log(`   POST   /api/auth/login`);
+      console.log(`   POST   /api/auth/verify`);
+      console.log(`   POST   /api/auth/set-password`);
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);
@@ -91,5 +101,11 @@ process.on('SIGTERM', async () => {
   process.exit(0);
 });
 
-startServer();
+// Export app for Vercel serverless functions
+export default app;
+
+// Only start server if not in Vercel environment
+if (process.env.VERCEL !== '1') {
+  startServer();
+}
 

@@ -53,9 +53,36 @@ model OrderItem {
   @@map("order_items")
 }
 
+model User {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String   @unique
+  displayName   String
+  email         String?
+  phone         String?
+  password      String?  // For admin login
+  role          UserRole @default(Customer)
+  totalOrders   Int      @default(0)
+  totalSpent    Float    @default(0)
+  lastOrderDate DateTime?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("users")
+  @@index([role])
+  @@index([isActive])
+}
+
 enum OrderStatus {
   Received
   Preparing
   Ready
   Completed
+}
+
+enum UserRole {
+  Customer
+  Staff
+  Manager
+  Admin
 }
