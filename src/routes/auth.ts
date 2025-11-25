@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
+import type { StringValue } from 'ms';
 import { prisma, getMongoDb } from '../config/database';
 import { ObjectId } from 'mongodb';
 
@@ -56,6 +57,11 @@ router.post('/login', async (req, res) => {
     }
 
     // Generate JWT token
+    const expiresInValue = (JWT_EXPIRES_IN as StringValue) || ('7d' as StringValue);
+    const signOptions: SignOptions = {
+      expiresIn: expiresInValue,
+    };
+
     const token = jwt.sign(
       { 
         userId: user.userId,
@@ -64,7 +70,7 @@ router.post('/login', async (req, res) => {
         displayName: user.displayName
       },
       JWT_SECRET,
-      { expiresIn: JWT_EXPIRES_IN }
+      signOptions
     );
 
     // Return user data (without password) and token
