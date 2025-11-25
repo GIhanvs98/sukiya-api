@@ -1,4 +1,4 @@
-import { Client, MiddlewareConfig } from '@line/bot-sdk';
+import { Client, MiddlewareConfig, ClientConfig } from '@line/bot-sdk';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -16,9 +16,17 @@ export function getLineClient(): Client | null {
     return _lineClient;
   }
   
-  if (process.env.LINE_CHANNEL_ACCESS_TOKEN && process.env.LINE_CHANNEL_SECRET) {
+  const accessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  const channelSecret = process.env.LINE_CHANNEL_SECRET;
+  
+  if (accessToken && channelSecret) {
     try {
-      _lineClient = new Client(lineConfig);
+      // Create ClientConfig with required string types
+      const clientConfig: ClientConfig = {
+        channelAccessToken: accessToken,
+        channelSecret: channelSecret,
+      };
+      _lineClient = new Client(clientConfig);
       return _lineClient;
     } catch (error) {
       console.warn('Failed to initialize LINE client:', error);

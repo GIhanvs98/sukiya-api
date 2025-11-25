@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { connectDatabase, disconnectDatabase } from './config/database';
@@ -101,5 +101,11 @@ process.on('SIGTERM', async () => {
   process.exit(0);
 });
 
-startServer();
+// Export app for Vercel serverless functions
+export default app;
+
+// Only start server if not in Vercel environment
+if (process.env.VERCEL !== '1') {
+  startServer();
+}
 
