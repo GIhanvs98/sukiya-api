@@ -39,6 +39,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongodb": "^7.0.0",
     "nodemon": "^3.1.11",
+    "serverless-http": "^4.0.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
