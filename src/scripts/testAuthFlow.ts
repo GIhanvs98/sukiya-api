@@ -6,7 +6,7 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-const API_BASE_URL = process.env.API_BASE_URL || 'https://sukiyaapifinal.vercel.app';
+const API_BASE_URL = process.env.API_BASE_URL || 'https://sukiyaapi.vercel.app';
 const TEST_USER_ID = 'admin';
 const TEST_PASSWORD = 'admin123';
 
@@ -240,4 +240,5 @@ async function testAuthFlow() {
 
 // Run the test
 testAuthFlow().catch(console.error);
+
 

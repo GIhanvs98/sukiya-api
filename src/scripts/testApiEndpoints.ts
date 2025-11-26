@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const BASE_URL = process.env.API_URL || 'https://sukiyaapifinal.vercel.app';
+const BASE_URL = process.env.API_URL || 'https://sukiyaapi.vercel.app';
 
 interface TestResult {
   endpoint: string;

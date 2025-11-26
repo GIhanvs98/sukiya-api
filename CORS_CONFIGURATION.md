@@ -81,3 +81,4 @@ curl -X OPTIONS https://sukiyaapifinal.vercel.app/api/auth/login \
 ✅ Content-Type and Authorization headers are allowed
 ✅ Preflight (OPTIONS) requests are handled automatically by cors middleware
 
+

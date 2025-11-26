@@ -125,3 +125,4 @@ curl -X POST https://sukiyaapifinal.vercel.app/api/auth/login \
 - Connection pooling is handled automatically by Prisma
 - Timeouts are set to prevent hanging requests
 
+

@@ -13,12 +13,15 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5001;
 
-// CORS configuration - allow all origins for now (can be restricted in production)
+// CORS configuration
 app.use(cors({
-  origin: 'https://sukiyarestaurant.vercel.app', // In production, replace with specific frontend URL
+  origin: [
+    'http://localhost:3000',
+    'https://sukiyarestaurant.vercel.app'
+  ],
   methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: false
+  credentials: false // Set to true if you need cookies/auth headers
 }));
 app.use(express.json());
 
@@ -39,28 +42,32 @@ app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
 
 // 404 handler for API routes (must be after all routes, before error handler)
-app.use('/api/*', (req, res) => {
-  console.log(`⚠️  404 - Route not found: ${req.method} ${req.originalUrl}`);
-  res.status(404).json({ 
-    error: 'Route not found', 
-    method: req.method, 
-    path: req.originalUrl,
-    availableRoutes: [
-      'GET /api/menu',
-      'POST /api/menu',
-      'PATCH /api/menu/:id',
-      'DELETE /api/menu/:id',
-      'GET /api/orders',
-      'PATCH /api/orders/:id/status',
-      'GET /api/users',
-      'POST /api/users',
-      'PATCH /api/users/:id',
-      'DELETE /api/users/:id',
-      'POST /api/auth/login',
-      'POST /api/auth/verify',
-      'POST /api/auth/set-password'
-    ]
-  });
+// Fixed for Vercel: Use middleware pattern instead of /api/* to avoid breaking Vercel routing
+app.use((req, res, next) => {
+  if (req.originalUrl.startsWith('/api')) {
+    console.log(`⚠️  404 - Route not found: ${req.method} ${req.originalUrl}`);
+    return res.status(404).json({ 
+      error: 'Route not found', 
+      method: req.method, 
+      path: req.originalUrl,
+      availableRoutes: [
+        'GET /api/menu',
+        'POST /api/menu',
+        'PATCH /api/menu/:id',
+        'DELETE /api/menu/:id',
+        'GET /api/orders',
+        'PATCH /api/orders/:id/status',
+        'GET /api/users',
+        'POST /api/users',
+        'PATCH /api/users/:id',
+        'DELETE /api/users/:id',
+        'POST /api/auth/login',
+        'POST /api/auth/verify',
+        'POST /api/auth/set-password'
+      ]
+    });
+  }
+  next();
 });
 
 // Global error handler middleware (must be last - Express recognizes 4-param handlers as error handlers)
