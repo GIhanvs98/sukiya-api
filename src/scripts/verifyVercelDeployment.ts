@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const DEPLOYED_URL = 'https://sukiyaapifinal.vercel.app';
+const DEPLOYED_URL = 'https://sukiyaapi.vercel.app';
 
 interface CheckResult {
   name: string;
