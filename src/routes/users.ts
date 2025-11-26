@@ -215,6 +215,59 @@ router.patch('/:id', async (req, res) => {
   }
 });
 
+// GET /api/users/userId/:userId - Get user by userId
+router.get('/userId/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const user = await prisma.user.findUnique({
+      where: { userId: userId.trim() },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Get order stats
+    const orders = await prisma.order.findMany({
+      where: { userId: user.userId },
+      select: {
+        total: true,
+        createdAt: true,
+      },
+    });
+
+    const totalOrders = orders.length;
+    const totalSpent = orders.reduce((sum, order) => sum + order.total, 0);
+    const lastOrderDate = orders[0]?.createdAt || null;
+
+    // Transform to match frontend format
+    const userWithStats = {
+      _id: user.id,
+      id: user.id,
+      userId: user.userId,
+      displayName: user.displayName,
+      email: user.email,
+      phone: user.phone,
+      role: user.role.toLowerCase(),
+      totalOrders,
+      totalSpent,
+      lastOrderDate: lastOrderDate?.toISOString(),
+      createdAt: user.createdAt.toISOString(),
+      updatedAt: user.updatedAt.toISOString(),
+      isActive: user.isActive,
+    };
+
+    res.json(userWithStats);
+  } catch (error: any) {
+    console.error('Error fetching user by userId:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch user',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
 // DELETE /api/users/:id - Hard delete user (admin only)
 router.delete('/:id', async (req, res) => {
   try {
