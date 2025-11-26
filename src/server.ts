@@ -68,17 +68,38 @@ app.use((err: any, req: Request, res: Response, next: any) => {
   console.error('❌ Unhandled error in Express:', err);
   console.error('Error stack:', err?.stack);
   console.error('Error message:', err?.message);
+  console.error('Request path:', req.path);
+  console.error('Request method:', req.method);
   
-  if (!res.headersSent) {
-    res.status(err.status || 500).json({
-      error: err.message || 'Internal Server Error',
-      ...(process.env.NODE_ENV === 'development' && {
-        details: err.message,
-        stack: err.stack,
-        type: err.name
-      })
-    });
+  // Don't send response if headers already sent
+  if (res.headersSent) {
+    console.error('⚠️  Response already sent, cannot send error response');
+    return next(err);
   }
+  
+  // Determine status code
+  const status = err.status || err.statusCode || 500;
+  
+  // Build error response
+  const errorResponse: any = {
+    error: err.message || 'Internal Server Error'
+  };
+  
+  // Add details in development mode
+  if (process.env.NODE_ENV === 'development') {
+    errorResponse.details = err.message;
+    errorResponse.type = err.name;
+    if (err.stack) {
+      // Only include first few lines of stack to avoid huge responses
+      const stackLines = err.stack.split('\n').slice(0, 5);
+      errorResponse.stack = stackLines.join('\n');
+    }
+    if (err.code) {
+      errorResponse.code = err.code;
+    }
+  }
+  
+  res.status(status).json(errorResponse);
 });
 
 async function startServer() {
