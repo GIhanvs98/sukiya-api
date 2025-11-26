@@ -57,7 +57,7 @@ router.post('/login', async (req, res) => {
     }
 
     // Generate JWT token
-    const expiresInValue = (JWT_EXPIRES_IN as StringValue) || ('7d' as StringValue);
+    const expiresInValue: StringValue = (JWT_EXPIRES_IN as StringValue) || ('7d' as StringValue);
     const signOptions: SignOptions = {
       expiresIn: expiresInValue,
     };
@@ -65,7 +65,7 @@ router.post('/login', async (req, res) => {
     const token = jwt.sign(
       { 
         userId: user.userId,
-        id: user.id,
+        id: user._id.toString(), // Use _id from MongoDB document
         role: user.role,
         displayName: user.displayName
       },

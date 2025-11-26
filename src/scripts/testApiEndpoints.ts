@@ -47,7 +47,7 @@ async function testEndpoint(
 
     const response = await fetch(`${BASE_URL}${endpoint}`, fetchOptions);
     const responseTime = Date.now() - startTime;
-    const data = await response.json().catch(() => ({}));
+    const data = await response.json().catch(() => ({})) as { error?: string };
 
     return {
       endpoint,
@@ -152,7 +152,7 @@ async function runTests() {
       });
 
       if (loginResponse.ok) {
-        const loginData = await loginResponse.json();
+        const loginData = await loginResponse.json() as { token: string };
         const token = loginData.token;
 
         console.log('✅ Login successful, testing authenticated endpoints...\n');

@@ -13,12 +13,23 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5001;
 
-app.use(cors());
+// CORS configuration - allow all origins for now (can be restricted in production)
+app.use(cors({
+  origin: '*', // In production, replace with specific frontend URL
+  methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: false
+}));
 app.use(express.json());
 
-// Health check endpoint
+// Health check endpoint (no database required)
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Backend API is running' });
+  res.json({ 
+    status: 'ok', 
+    message: 'Backend API is running',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'unknown'
+  });
 });
 
 // API routes
