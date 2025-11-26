@@ -79,18 +79,22 @@ async function testDatabaseConnection() {
   const hasDatabaseUrl = !!process.env.DATABASE_URL;
   if (hasDatabaseUrl) {
     const url = process.env.DATABASE_URL;
-    // Mask sensitive parts of the URL
-    const maskedUrl = url.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@');
-    console.log(`✅ DATABASE_URL is set: ${maskedUrl}`);
-    
-    // Check if database name is in URL
-    const urlMatch = url.match(/mongodb(\+srv)?:\/\/[^\/]+\/([^?]+)/);
-    if (urlMatch && urlMatch[2]) {
-      console.log(`✅ Database name found in URL: ${urlMatch[2]}`);
+    if (!url) {
+      console.error('❌ DATABASE_URL is not set in environment variables');
     } else {
-      console.warn('⚠️  Database name not found in DATABASE_URL');
-      console.warn('   Prisma requires database name in connection string');
-      console.warn('   Example: mongodb+srv://user:pass@host.net/sukiyarestaurant');
+      // Mask sensitive parts of the URL
+      const maskedUrl = url.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@');
+      console.log(`✅ DATABASE_URL is set: ${maskedUrl}`);
+      
+      // Check if database name is in URL
+      const urlMatch = url.match(/mongodb(\+srv)?:\/\/[^\/]+\/([^?]+)/);
+      if (urlMatch && urlMatch[2]) {
+        console.log(`✅ Database name found in URL: ${urlMatch[2]}`);
+      } else {
+        console.warn('⚠️  Database name not found in DATABASE_URL');
+        console.warn('   Prisma requires database name in connection string');
+        console.warn('   Example: mongodb+srv://user:pass@host.net/sukiyarestaurant');
+      }
     }
   } else {
     console.error('❌ DATABASE_URL is not set in environment variables');
