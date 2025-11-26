@@ -16,12 +16,14 @@ export const prisma = new PrismaClient({
 });
 
 // Native MongoDB client for write operations (avoids replica set requirement)
+// Serverless-optimized: Cache connections globally to prevent multiple connections per invocation
 let mongoClient: MongoClient | null = null;
 let mongoDb: Db | null = null;
+let isConnected = false; // Global connection state flag for serverless
 
 export async function getMongoDb(): Promise<Db> {
-  // Return existing connection if available
-  if (mongoDb && mongoClient) {
+  // Return existing connection if available and connected
+  if (isConnected && mongoDb && mongoClient) {
     try {
       // Ping to check if connection is still alive
       await mongoDb.admin().ping();
@@ -29,6 +31,7 @@ export async function getMongoDb(): Promise<Db> {
     } catch (error) {
       // Connection is dead, reset and reconnect
       console.warn('MongoDB connection lost, reconnecting...');
+      isConnected = false;
       mongoClient = null;
       mongoDb = null;
     }
@@ -64,11 +67,13 @@ export async function getMongoDb(): Promise<Db> {
     });
     await mongoClient.connect();
     mongoDb = mongoClient.db(dbName);
+    isConnected = true; // Mark as connected for serverless caching
     
     console.log('✅ Connected to MongoDB via native driver');
     return mongoDb;
   } catch (error: any) {
     // Reset on connection failure
+    isConnected = false;
     mongoClient = null;
     mongoDb = null;
     console.error('❌ Failed to connect to MongoDB:', error?.message || error);
@@ -76,30 +81,52 @@ export async function getMongoDb(): Promise<Db> {
   }
 }
 
+// Serverless-optimized: Cache Prisma connection state
+let prismaConnected = false;
+
 export async function connectDatabase(): Promise<void> {
+  // Skip if already connected (important for serverless)
+  if (prismaConnected && isConnected) {
+    return;
+  }
+  
   try {
-    await prisma.$connect();
-    console.log('✅ Connected to MongoDB via Prisma (read operations)');
+    if (!prismaConnected) {
+      await prisma.$connect();
+      prismaConnected = true;
+      console.log('✅ Connected to MongoDB via Prisma (read operations)');
+    }
     
     // Also connect native client for writes
-    await getMongoDb();
+    if (!isConnected) {
+      await getMongoDb();
+    }
   } catch (error) {
     console.error('❌ Failed to connect to database:', error);
+    prismaConnected = false;
+    isConnected = false;
     throw error;
   }
 }
 
 export async function disconnectDatabase(): Promise<void> {
   try {
-    await prisma.$disconnect();
+    if (prismaConnected) {
+      await prisma.$disconnect();
+      prismaConnected = false;
+    }
     if (mongoClient) {
       await mongoClient.close();
       mongoClient = null;
       mongoDb = null;
+      isConnected = false;
     }
     console.log('✅ Disconnected from database');
   } catch (error) {
     console.error('❌ Error disconnecting from database:', error);
+    // Reset state even on error
+    prismaConnected = false;
+    isConnected = false;
     throw error;
   }
 }
