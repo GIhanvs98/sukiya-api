@@ -11,7 +11,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-producti
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
 // POST /api/auth/login - Admin login
-router.post('/login', async (req, res) => {
+router.post('/login', async (req, res, next) => {
   try {
     const { userId, password } = req.body;
 
@@ -24,7 +24,17 @@ router.post('/login', async (req, res) => {
     }
 
     // Find user by userId using native MongoDB driver to get password field
-    const db = await getMongoDb();
+    let db;
+    try {
+      db = await getMongoDb();
+    } catch (dbError: any) {
+      console.error('Database connection error during login:', dbError);
+      return res.status(503).json({ 
+        error: 'Database connection failed',
+        details: process.env.NODE_ENV === 'development' ? dbError.message : undefined
+      });
+    }
+
     const user = await db.collection('users').findOne({
       userId: userId.trim()
     });
@@ -91,15 +101,15 @@ router.post('/login', async (req, res) => {
     });
   } catch (error: any) {
     console.error('Error during login:', error);
-    res.status(500).json({ 
-      error: 'Failed to authenticate',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    console.error('Error stack:', error?.stack);
+    console.error('Error message:', error?.message);
+    // Pass error to Express error handler
+    next(error);
   }
 });
 
 // POST /api/auth/verify - Verify token
-router.post('/verify', async (req, res) => {
+router.post('/verify', async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -140,15 +150,13 @@ router.post('/verify', async (req, res) => {
     }
   } catch (error: any) {
     console.error('Error verifying token:', error);
-    res.status(500).json({ 
-      error: 'Failed to verify token',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    // Pass error to Express error handler
+    next(error);
   }
 });
 
 // POST /api/auth/set-password - Set password for admin user (for initial setup)
-router.post('/set-password', async (req, res) => {
+router.post('/set-password', async (req, res, next) => {
   try {
     const { userId, password } = req.body;
 
@@ -195,10 +203,8 @@ router.post('/set-password', async (req, res) => {
     res.json({ message: 'Password set successfully' });
   } catch (error: any) {
     console.error('Error setting password:', error);
-    res.status(500).json({ 
-      error: 'Failed to set password',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    // Pass error to Express error handler
+    next(error);
   }
 });
 

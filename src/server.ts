@@ -38,7 +38,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
 
-// 404 handler for API routes
+// 404 handler for API routes (must be after all routes, before error handler)
 app.use('/api/*', (req, res) => {
   console.log(`⚠️  404 - Route not found: ${req.method} ${req.originalUrl}`);
   res.status(404).json({ 
@@ -63,6 +63,45 @@ app.use('/api/*', (req, res) => {
   });
 });
 
+// Global error handler middleware (must be last - Express recognizes 4-param handlers as error handlers)
+app.use((err: any, req: Request, res: Response, next: any) => {
+  console.error('❌ Unhandled error in Express:', err);
+  console.error('Error stack:', err?.stack);
+  console.error('Error message:', err?.message);
+  console.error('Request path:', req.path);
+  console.error('Request method:', req.method);
+  
+  // Don't send response if headers already sent
+  if (res.headersSent) {
+    console.error('⚠️  Response already sent, cannot send error response');
+    return next(err);
+  }
+  
+  // Determine status code
+  const status = err.status || err.statusCode || 500;
+  
+  // Build error response
+  const errorResponse: any = {
+    error: err.message || 'Internal Server Error'
+  };
+  
+  // Add details in development mode
+  if (process.env.NODE_ENV === 'development') {
+    errorResponse.details = err.message;
+    errorResponse.type = err.name;
+    if (err.stack) {
+      // Only include first few lines of stack to avoid huge responses
+      const stackLines = err.stack.split('\n').slice(0, 5);
+      errorResponse.stack = stackLines.join('\n');
+    }
+    if (err.code) {
+      errorResponse.code = err.code;
+    }
+  }
+  
+  res.status(status).json(errorResponse);
+});
+
 async function startServer() {
   try {
     try {
@@ -76,8 +115,8 @@ async function startServer() {
     await connectDatabase();
 
     app.listen(PORT, () => {
-      console.log(`🚀 Server running on http://localhost:${PORT}`);
-      console.log(`📋 Health check: http://localhost:${PORT}/health`);
+      console.log(`🚀 Server running on http://:${PORT}`);
+      console.log(`📋 Health check: http://:${PORT}/health`);
       console.log(`📊 Database: Connected to MongoDB`);
       console.log(`\n📡 API Routes:`);
       console.log(`   GET    /api/menu`);
