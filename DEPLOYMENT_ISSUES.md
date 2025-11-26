@@ -49,14 +49,14 @@ After setting environment variables:
 
 ### Test Health Endpoint:
 ```bash
-curl https://sukiyaapifinal.vercel.app/health
+curl https://sukiyaapi.vercel.app/health
 ```
 
 **Expected:** `{"status":"ok","message":"Backend API is running"}`
 
 ### Test API Endpoint:
 ```bash
-curl https://sukiyaapifinal.vercel.app/api/menu
+curl https://sukiyaapi.vercel.app/api/menu
 ```
 
 **Expected:** Array of menu items (or empty array `[]`)
@@ -96,7 +96,7 @@ This is more appropriate for production deployments.
 
 - **Vercel Dashboard:** https://vercel.com/dashboard
 - **MongoDB Atlas:** https://cloud.mongodb.com/
-- **API URL:** https://sukiyaapifinal.vercel.app
+- **API URL:** https://sukiyaapi.vercel.app
 
 
 

@@ -39,7 +39,7 @@
 
 ### Test Health Endpoint (No DB Required):
 ```bash
-curl https://sukiyaapifinal.vercel.app/health
+curl https://sukiyaapi.vercel.app/health
 ```
 
 Expected:
@@ -54,7 +54,7 @@ Expected:
 
 ### Test Login (Requires DB):
 ```bash
-curl -X POST https://sukiyaapifinal.vercel.app/api/auth/login \
+curl -X POST https://sukiyaapi.vercel.app/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"userId":"admin","password":"admin123"}'
 ```
@@ -106,12 +106,12 @@ curl -X POST https://sukiyaapifinal.vercel.app/api/auth/login \
 
 3. **Test health endpoint:**
    ```bash
-   curl https://sukiyaapifinal.vercel.app/health
+   curl https://sukiyaapi.vercel.app/health
    ```
 
 4. **Test login endpoint:**
    ```bash
-   curl -X POST https://sukiyaapifinal.vercel.app/api/auth/login \
+   curl -X POST https://sukiyaapi.vercel.app/api/auth/login \
      -H "Content-Type: application/json" \
      -d '{"userId":"admin","password":"admin123"}'
    ```

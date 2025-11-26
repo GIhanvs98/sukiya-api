@@ -42,14 +42,14 @@ Added explicit build and install commands:
 
 ### Correct Endpoints:
 
-- **Login:** `POST https://sukiyaapifinal.vercel.app/api/auth/login`
-- **Verify Token:** `POST https://sukiyaapifinal.vercel.app/api/auth/verify`
-- **Health Check:** `GET https://sukiyaapifinal.vercel.app/health`
+- **Login:** `POST https://sukiyaapi.vercel.app/api/auth/login`
+- **Verify Token:** `POST https://sukiyaapi.vercel.app/api/auth/verify`
+- **Health Check:** `GET https://sukiyaapi.vercel.app/health`
 
 ### Example Request (Postman):
 
 ```
-POST https://sukiyaapifinal.vercel.app/api/auth/login
+POST https://sukiyaapi.vercel.app/api/auth/login
 Content-Type: application/json
 
 {
@@ -71,7 +71,7 @@ Content-Type: application/json
 
 3. **Test the endpoint:**
    ```bash
-   curl -X POST https://sukiyaapifinal.vercel.app/api/auth/login \
+   curl -X POST https://sukiyaapi.vercel.app/api/auth/login \
      -H "Content-Type: application/json" \
      -d '{"userId":"staff","password":"staff123"}'
    ```

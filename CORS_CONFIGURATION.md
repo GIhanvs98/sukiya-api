@@ -40,7 +40,7 @@ app.use(cors({
 
 ### Test from Browser Console:
 ```javascript
-fetch('https://sukiyaapifinal.vercel.app/api/menu', {
+fetch('https://sukiyaapi.vercel.app/api/menu', {
   method: 'GET',
   headers: {
     'Content-Type': 'application/json'
@@ -53,7 +53,7 @@ fetch('https://sukiyaapifinal.vercel.app/api/menu', {
 
 ### Test OPTIONS (Preflight) Request:
 ```bash
-curl -X OPTIONS https://sukiyaapifinal.vercel.app/api/auth/login \
+curl -X OPTIONS https://sukiyaapi.vercel.app/api/auth/login \
   -H "Origin: https://sukiyarestaurant.vercel.app" \
   -H "Access-Control-Request-Method: POST" \
   -H "Access-Control-Request-Headers: Content-Type" \

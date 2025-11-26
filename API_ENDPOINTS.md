@@ -1,6 +1,6 @@
 # Sukiya Restaurant API Endpoints
 
-**Deployed URL:** https://sukiyaapifinal.vercel.app
+**Deployed URL:** https://sukiyaapi.vercel.app
 
 ## 📋 Available Endpoints
 
@@ -86,30 +86,30 @@ npm run test:db
 
 ### Login
 ```bash
-curl -X POST https://sukiyaapifinal.vercel.app/api/auth/login \
+curl -X POST https://sukiyaapi.vercel.app/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"userId":"admin","password":"admin123"}'
 ```
 
 ### Get Menu Items
 ```bash
-curl https://sukiyaapifinal.vercel.app/api/menu
+curl https://sukiyaapi.vercel.app/api/menu
 ```
 
 ### Get Menu Items (Admin - all items)
 ```bash
-curl https://sukiyaapifinal.vercel.app/api/menu \
+curl https://sukiyaapi.vercel.app/api/menu \
   -H "Authorization: Bearer YOUR_TOKEN_HERE"
 ```
 
 ### Get Orders
 ```bash
-curl https://sukiyaapifinal.vercel.app/api/orders
+curl https://sukiyaapi.vercel.app/api/orders
 ```
 
 ### Update Order Status
 ```bash
-curl -X PATCH https://sukiyaapifinal.vercel.app/api/orders/ORDER_ID/status \
+curl -X PATCH https://sukiyaapi.vercel.app/api/orders/ORDER_ID/status \
   -H "Content-Type: application/json" \
   -d '{"status":"Preparing"}'
 ```
