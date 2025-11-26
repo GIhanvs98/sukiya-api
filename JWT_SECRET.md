@@ -70,7 +70,7 @@ After setting the secret, verify it's working:
 
 ```bash
 # Test login (should work with new secret)
-curl -X POST https://sukiyaapifinal.vercel.app/api/auth/login \
+curl -X POST https://sukiyaapi.vercel.app/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"userId":"admin","password":"admin123"}'
 ```

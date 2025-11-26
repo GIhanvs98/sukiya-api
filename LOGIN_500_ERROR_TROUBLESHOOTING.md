@@ -84,10 +84,10 @@ npm run test:db
 **Test via API:**
 ```bash
 # Test health endpoint (no DB)
-curl https://sukiyaapifinal.vercel.app/health
+curl https://sukiyaapi.vercel.app/health
 
 # Test login endpoint
-curl -X POST https://sukiyaapifinal.vercel.app/api/auth/login \
+curl -X POST https://sukiyaapi.vercel.app/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"userId":"admin","password":"admin123"}'
 ```

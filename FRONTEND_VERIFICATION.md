@@ -73,7 +73,7 @@
 
 ### Production Deployment
 
-**Backend API:** `https://sukiyaapifinal.vercel.app`
+**Backend API:** `https://sukiyaapi.vercel.app`
 **Frontend:** `https://sukiyarestaurant.vercel.app`
 
 **Note:** After deploying the fix, wait 1-2 minutes for Vercel to redeploy, then test the API endpoints.
@@ -94,8 +94,8 @@
 1. Wait for Vercel to redeploy the backend API
 2. Test the production API endpoints:
    ```bash
-   curl https://sukiyaapifinal.vercel.app/api/health
-   curl https://sukiyaapifinal.vercel.app/api/menu
+   curl https://sukiyaapi.vercel.app/api/health
+   curl https://sukiyaapi.vercel.app/api/menu
    ```
 3. Test frontend login on production deployment
 4. Verify CORS is working by checking browser console for CORS errors

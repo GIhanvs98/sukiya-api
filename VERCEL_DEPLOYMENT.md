@@ -44,13 +44,13 @@ After adding environment variables:
 - [ ] `DATABASE_URL` includes database name (`/sukiyarestaurant`)
 - [ ] Environment variables are set for `Production` environment
 - [ ] Application has been redeployed after setting variables
-- [ ] Health check endpoint returns 200: `https://sukiyaapifinal.vercel.app/health`
+- [ ] Health check endpoint returns 200: `https://sukiyaapi.vercel.app/health`
 
 ## 🔍 Testing Deployment
 
 ### Test Health Endpoint:
 ```bash
-curl https://sukiyaapifinal.vercel.app/health
+curl https://sukiyaapi.vercel.app/health
 ```
 
 Expected response:
@@ -63,14 +63,14 @@ Expected response:
 
 ### Test Database Connection:
 ```bash
-curl https://sukiyaapifinal.vercel.app/api/menu
+curl https://sukiyaapi.vercel.app/api/menu
 ```
 
 Should return menu items array (empty array `[]` if no items, or items if seeded).
 
 ### Test Authentication:
 ```bash
-curl -X POST https://sukiyaapifinal.vercel.app/api/auth/login \
+curl -X POST https://sukiyaapi.vercel.app/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"userId":"admin","password":"admin123"}'
 ```
@@ -122,7 +122,7 @@ sukiya-api/
 ## 🔗 Useful Links
 
 - **Vercel Dashboard:** https://vercel.com/dashboard
-- **Deployed API:** https://sukiyaapifinal.vercel.app
+- **Deployed API:** https://sukiyaapi.vercel.app
 - **API Documentation:** See `API_ENDPOINTS.md`
 
 ## 📝 Notes
