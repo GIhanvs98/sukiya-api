@@ -15,7 +15,7 @@ const PORT = process.env.PORT || 5001;
 
 // CORS configuration - allow all origins for now (can be restricted in production)
 app.use(cors({
-  origin: '*', // In production, replace with specific frontend URL
+  origin: 'https://sukiyarestaurant.vercel.app', // In production, replace with specific frontend URL
   methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: false
@@ -115,8 +115,8 @@ async function startServer() {
     await connectDatabase();
 
     app.listen(PORT, () => {
-      console.log(`🚀 Server running on http://:${PORT}`);
-      console.log(`📋 Health check: http://:${PORT}/health`);
+      console.log(`🚀 Server running on http://localhost:${PORT}`);
+      console.log(`📋 Health check: http://localhost:${PORT}/health`);
       console.log(`📊 Database: Connected to MongoDB`);
       console.log(`\n📡 API Routes:`);
       console.log(`   GET    /api/menu`);
@@ -132,6 +132,20 @@ async function startServer() {
       console.log(`   POST   /api/auth/login`);
       console.log(`   POST   /api/auth/verify`);
       console.log(`   POST   /api/auth/set-password`);
+    }).on('error', (error: any) => {
+      if (error.code === 'EADDRINUSE') {
+        console.error(`❌ Port ${PORT} is already in use.`);
+        console.error(`   Another process is using this port.`);
+        console.error(`   To fix this:`);
+        console.error(`   1. Stop the other process using port ${PORT}`);
+        console.error(`   2. Or change PORT in .env to a different port`);
+        console.error(`   3. On Windows, find and kill the process:`);
+        console.error(`      netstat -ano | findstr :${PORT}`);
+        console.error(`      taskkill /PID <PID> /F`);
+      } else {
+        console.error('❌ Failed to start server:', error);
+      }
+      process.exit(1);
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);
