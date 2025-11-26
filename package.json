@@ -14,7 +14,10 @@
     "seed": "tsx src/scripts/seed.ts",
     "seed:orders": "tsx src/scripts/seedOrders.ts",
     "seed:users": "tsx src/scripts/seedUsers.ts",
-    "seed:passwords": "tsx src/scripts/setUserPasswords.ts"
+    "seed:passwords": "tsx src/scripts/setUserPasswords.ts",
+    "test:db": "tsx src/scripts/testDbConnection.ts",
+    "test:api": "tsx src/scripts/testApiEndpoints.ts",
+    "verify:vercel": "tsx src/scripts/verifyVercelDeployment.ts"
   },
   "keywords": [
     "line",
