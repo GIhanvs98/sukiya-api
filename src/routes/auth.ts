@@ -65,7 +65,7 @@ router.post('/login', async (req, res) => {
     const token = jwt.sign(
       { 
         userId: user.userId,
-        id: user.id,
+        id: user._id.toString(), // Use _id from MongoDB document
         role: user.role,
         displayName: user.displayName
       },
