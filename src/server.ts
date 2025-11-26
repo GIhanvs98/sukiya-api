@@ -22,9 +22,14 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Health check endpoint
+// Health check endpoint (no database required)
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Backend API is running' });
+  res.json({ 
+    status: 'ok', 
+    message: 'Backend API is running',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'unknown'
+  });
 });
 
 // API routes
