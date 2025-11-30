@@ -15,15 +15,14 @@ const PORT = process.env.PORT || 5001;
 
 // CORS configuration
 app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'https://sukiyarestaurant.vercel.app'
-  ],
-  methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: false // Set to true if you need cookies/auth headers
+  origin: "*",
+  methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: false
 }));
+
 app.use(express.json());
+
 
 // Health check endpoint (no database required)
 app.get('/health', (req, res) => {
