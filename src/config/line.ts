@@ -8,6 +8,13 @@ export const lineConfig: MiddlewareConfig = {
   channelSecret: process.env.LINE_CHANNEL_SECRET || '',
 };
 
+// LINE Login OAuth configuration
+export const lineLoginConfig = {
+  channelId: process.env.LINE_LOGIN_CHANNEL_ID || '',
+  channelSecret: process.env.LINE_LOGIN_CHANNEL_SECRET || process.env.LINE_CHANNEL_SECRET || '',
+  callbackUrl: process.env.LINE_LOGIN_CALLBACK_URL || '',
+};
+
 // Lazy initialization of LINE client to avoid errors when tokens are missing
 let _lineClient: Client | null = null;
 
