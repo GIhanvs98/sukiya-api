@@ -11,11 +11,12 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy package files
-COPY package*.json ./
+COPY package.json package-lock.json* ./
 COPY prisma ./prisma/
 
 # Install all dependencies (including dev dependencies for build)
-RUN npm ci && npm cache clean --force
+# Use npm install instead of npm ci for better compatibility
+RUN npm install && npm cache clean --force
 
 # Copy source code
 COPY . .
