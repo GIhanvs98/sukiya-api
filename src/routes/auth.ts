@@ -325,7 +325,7 @@ router.get('/line/callback', async (req, res, next) => {
       });
     }
 
-    const tokenData = await tokenResponse.json();
+    const tokenData = await tokenResponse.json() as { access_token?: string; id_token?: string };
     const { access_token, id_token } = tokenData;
 
     if (!access_token || !id_token) {
@@ -354,7 +354,7 @@ router.get('/line/callback', async (req, res, next) => {
       });
     }
 
-    const userInfo = await verifyResponse.json();
+    const userInfo = await verifyResponse.json() as { sub?: string; name?: string; picture?: string; email?: string };
     
     // Get user profile from LINE
     const profileResponse = await fetch('https://api.line.me/v2/profile', {
@@ -372,10 +372,15 @@ router.get('/line/callback', async (req, res, next) => {
       });
     }
 
-    const profile = await profileResponse.json();
+    const profile = await profileResponse.json() as { userId?: string; displayName?: string; pictureUrl?: string };
     
     // Combine user info from ID token and profile
     const lineUserId = userInfo.sub || profile.userId;
+    
+    if (!lineUserId) {
+      return res.status(400).json({ error: 'Failed to get LINE user ID' });
+    }
+    
     const displayName = profile.displayName || userInfo.name || 'LINE User';
     const pictureUrl = profile.pictureUrl || userInfo.picture;
     const email = userInfo.email;
@@ -433,6 +438,11 @@ router.get('/line/callback', async (req, res, next) => {
       user = await db.collection('users').findOne({
         _id: user._id
       });
+    }
+
+    // Check if user exists (should always exist at this point, but TypeScript needs this check)
+    if (!user) {
+      return res.status(500).json({ error: 'Failed to create or retrieve user' });
     }
 
     // Check if user is active
