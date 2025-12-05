@@ -19,6 +19,9 @@
     "test:db": "tsx src/scripts/testDbConnection.ts",
     "test:api": "tsx src/scripts/testApiEndpoints.ts",
     "test:auth": "tsx src/scripts/testAuthFlow.ts",
+    "test:auth:complete": "tsx src/scripts/testAuthComplete.ts",
+    "test:push": "tsx src/scripts/testPushNotifications.ts",
+    "test:order-push": "tsx src/scripts/testOrderWithPush.ts",
     "verify:auth": "tsx src/scripts/verifyAuthDependencies.ts",
     "verify:vercel": "tsx src/scripts/verifyVercelDeployment.ts"
   },
