@@ -4,6 +4,8 @@ import jwt, { SignOptions } from 'jsonwebtoken';
 import type { StringValue } from 'ms';
 import { prisma, getMongoDb } from '../config/database';
 import { ObjectId } from 'mongodb';
+import { lineLoginConfig } from '../config/line';
+import crypto from 'crypto';
 
 const router = Router();
 
@@ -48,8 +50,9 @@ router.post('/login', async (req, res, next) => {
       return res.status(401).json({ error: 'Account is inactive' });
     }
 
-    // Check if user has admin, manager, or staff role
-    if (user.role !== 'Admin' && user.role !== 'Manager' && user.role !== 'Staff') {
+    // Check if user has admin, manager, or staff role (case-insensitive check)
+    const userRole = user.role?.toString().toLowerCase();
+    if (userRole !== 'admin' && userRole !== 'manager' && userRole !== 'staff') {
       return res.status(403).json({ error: 'Access denied. Admin, Manager, or Staff role required' });
     }
 
@@ -121,31 +124,55 @@ router.post('/verify', async (req, res, next) => {
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as any;
       
-      // Verify user still exists and is active
-      const user = await prisma.user.findUnique({
-        where: { id: decoded.id },
-      });
-
-      if (!user || !user.isActive) {
-        return res.status(401).json({ error: 'User not found or inactive' });
+      // Get MongoDB connection
+      let db;
+      try {
+        db = await getMongoDb();
+      } catch (dbError: any) {
+        console.error('Database connection error during verify:', dbError);
+        return res.status(503).json({ 
+          error: 'Database connection failed',
+          details: process.env.NODE_ENV === 'development' ? dbError.message : undefined
+        });
       }
 
+      // Verify user still exists and is active using MongoDB native driver (consistent with login)
+      const user = await db.collection('users').findOne({
+        _id: new ObjectId(decoded.id)
+      });
+
+      if (!user) {
+        return res.status(401).json({ error: 'User not found' });
+      }
+
+      if (!user.isActive) {
+        return res.status(401).json({ error: 'User account is inactive' });
+      }
+
+      // Return user data (without password) - consistent format with login
       res.json({
         valid: true,
         user: {
-          _id: user.id,
-          id: user.id,
+          _id: user._id.toString(),
+          id: user._id.toString(),
           userId: user.userId,
           displayName: user.displayName,
-          email: user.email,
-          phone: user.phone,
+          email: user.email || undefined,
+          phone: user.phone || undefined,
           role: user.role.toLowerCase(),
           isActive: user.isActive,
-          createdAt: user.createdAt.toISOString(),
-          updatedAt: user.updatedAt.toISOString(),
+          createdAt: user.createdAt instanceof Date ? user.createdAt.toISOString() : new Date(user.createdAt).toISOString(),
+          updatedAt: user.updatedAt instanceof Date ? user.updatedAt.toISOString() : new Date(user.updatedAt).toISOString(),
         },
       });
-    } catch (jwtError) {
+    } catch (jwtError: any) {
+      // Handle JWT verification errors
+      if (jwtError.name === 'TokenExpiredError') {
+        return res.status(401).json({ error: 'Token has expired' });
+      }
+      if (jwtError.name === 'JsonWebTokenError') {
+        return res.status(401).json({ error: 'Invalid token' });
+      }
       return res.status(401).json({ error: 'Invalid or expired token' });
     }
   } catch (error: any) {
@@ -180,8 +207,9 @@ router.post('/set-password', async (req, res, next) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Check if user has admin, manager, or staff role
-    if (user.role !== 'Admin' && user.role !== 'Manager' && user.role !== 'Staff') {
+    // Check if user has admin, manager, or staff role (case-insensitive check)
+    const userRole = user.role?.toString().toLowerCase();
+    if (userRole !== 'admin' && userRole !== 'manager' && userRole !== 'staff') {
       return res.status(403).json({ error: 'Access denied. Admin, Manager, or Staff role required' });
     }
 
@@ -204,6 +232,269 @@ router.post('/set-password', async (req, res, next) => {
   } catch (error: any) {
     console.error('Error setting password:', error);
     // Pass error to Express error handler
+    next(error);
+  }
+});
+
+// LINE Login OAuth endpoints
+
+// GET /api/auth/line/login - Generate LINE login URL
+router.get('/line/login', async (req, res, next) => {
+  try {
+    const { channelId, channelSecret, callbackUrl } = lineLoginConfig;
+
+    if (!channelId || !channelSecret || !callbackUrl) {
+      return res.status(500).json({ 
+        error: 'LINE Login configuration is incomplete',
+        missing: {
+          channelId: !channelId,
+          channelSecret: !channelSecret,
+          callbackUrl: !callbackUrl
+        }
+      });
+    }
+
+    // Generate state parameter for CSRF protection
+    const state = crypto.randomBytes(32).toString('hex');
+    
+    // Store state in session or return it to client to verify later
+    // For now, we'll return it and the client should send it back in the callback
+    
+    // Build LINE Login URL
+    const lineLoginUrl = new URL('https://access.line.me/oauth2/v2.1/authorize');
+    lineLoginUrl.searchParams.set('response_type', 'code');
+    lineLoginUrl.searchParams.set('client_id', channelId);
+    lineLoginUrl.searchParams.set('redirect_uri', callbackUrl);
+    lineLoginUrl.searchParams.set('state', state);
+    lineLoginUrl.searchParams.set('scope', 'profile openid email');
+    lineLoginUrl.searchParams.set('nonce', crypto.randomBytes(16).toString('hex'));
+
+    res.json({
+      loginUrl: lineLoginUrl.toString(),
+      state: state
+    });
+  } catch (error: any) {
+    console.error('Error generating LINE login URL:', error);
+    next(error);
+  }
+});
+
+// GET /api/auth/line/callback - Handle LINE OAuth callback
+router.get('/line/callback', async (req, res, next) => {
+  try {
+    const { code, state, error, error_description } = req.query;
+
+    if (error) {
+      return res.status(400).json({ 
+        error: 'LINE Login failed',
+        error_description: error_description || error
+      });
+    }
+
+    if (!code) {
+      return res.status(400).json({ error: 'Authorization code is missing' });
+    }
+
+    const { channelId, channelSecret, callbackUrl } = lineLoginConfig;
+
+    if (!channelId || !channelSecret || !callbackUrl) {
+      return res.status(500).json({ error: 'LINE Login configuration is incomplete' });
+    }
+
+    // Exchange authorization code for access token
+    const tokenResponse = await fetch('https://api.line.me/oauth2/v2.1/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code: code as string,
+        redirect_uri: callbackUrl,
+        client_id: channelId,
+        client_secret: channelSecret,
+      }),
+    });
+
+    if (!tokenResponse.ok) {
+      const errorData = await tokenResponse.json().catch(() => ({}));
+      console.error('LINE token exchange failed:', errorData);
+      return res.status(400).json({ 
+        error: 'Failed to exchange authorization code',
+        details: errorData
+      });
+    }
+
+    const tokenData = await tokenResponse.json() as { access_token?: string; id_token?: string };
+    const { access_token, id_token } = tokenData;
+
+    if (!access_token || !id_token) {
+      return res.status(400).json({ error: 'Invalid token response from LINE' });
+    }
+
+    // Verify and decode ID token to get user info
+    // For simplicity, we'll call LINE's verify endpoint
+    const verifyResponse = await fetch('https://api.line.me/oauth2/v2.1/verify', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        id_token: id_token,
+        client_id: channelId,
+      }),
+    });
+
+    if (!verifyResponse.ok) {
+      const errorData = await verifyResponse.json().catch(() => ({}));
+      console.error('LINE ID token verification failed:', errorData);
+      return res.status(400).json({ 
+        error: 'Failed to verify ID token',
+        details: errorData
+      });
+    }
+
+    const userInfo = await verifyResponse.json() as { sub?: string; name?: string; picture?: string; email?: string };
+    
+    // Get user profile from LINE
+    const profileResponse = await fetch('https://api.line.me/v2/profile', {
+      headers: {
+        'Authorization': `Bearer ${access_token}`,
+      },
+    });
+
+    if (!profileResponse.ok) {
+      const errorData = await profileResponse.json().catch(() => ({}));
+      console.error('LINE profile fetch failed:', errorData);
+      return res.status(400).json({ 
+        error: 'Failed to fetch user profile',
+        details: errorData
+      });
+    }
+
+    const profile = await profileResponse.json() as { userId?: string; displayName?: string; pictureUrl?: string };
+    
+    // Combine user info from ID token and profile
+    const lineUserId = userInfo.sub || profile.userId;
+    
+    if (!lineUserId) {
+      return res.status(400).json({ error: 'Failed to get LINE user ID' });
+    }
+    
+    const displayName = profile.displayName || userInfo.name || 'LINE User';
+    const pictureUrl = profile.pictureUrl || userInfo.picture;
+    const email = userInfo.email;
+
+    // Get MongoDB connection
+    let db;
+    try {
+      db = await getMongoDb();
+    } catch (dbError: any) {
+      console.error('Database connection error during LINE login:', dbError);
+      return res.status(503).json({ 
+        error: 'Database connection failed',
+        details: process.env.NODE_ENV === 'development' ? dbError.message : undefined
+      });
+    }
+
+    // Find or create user by LINE user ID
+    let user = await db.collection('users').findOne({
+      lineUserId: lineUserId
+    });
+
+    if (!user) {
+      // Create new user with LINE login
+      const newUser = {
+        userId: `line_${lineUserId.substring(0, 12)}`, // Generate a userId from LINE ID
+        lineUserId: lineUserId,
+        displayName: displayName,
+        email: email || undefined,
+        pictureUrl: pictureUrl || undefined,
+        role: 'customer',
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        totalOrders: 0,
+        totalSpent: 0,
+      };
+
+      const insertResult = await db.collection('users').insertOne(newUser);
+      user = { ...newUser, _id: insertResult.insertedId };
+    } else {
+      // Update existing user's LINE info
+      await db.collection('users').updateOne(
+        { _id: user._id },
+        {
+          $set: {
+            displayName: displayName,
+            email: email || user.email,
+            pictureUrl: pictureUrl || user.pictureUrl,
+            updatedAt: new Date(),
+          }
+        }
+      );
+      
+      // Refresh user data
+      user = await db.collection('users').findOne({
+        _id: user._id
+      });
+    }
+
+    // Check if user exists (should always exist at this point, but TypeScript needs this check)
+    if (!user) {
+      return res.status(500).json({ error: 'Failed to create or retrieve user' });
+    }
+
+    // Check if user is active
+    if (!user.isActive) {
+      return res.status(401).json({ error: 'Account is inactive' });
+    }
+
+    // LINE login is only allowed for customers
+    // Admin, Manager, and Staff must use regular userId/password login
+    const userRole = user.role?.toString().toLowerCase();
+    if (userRole !== 'customer') {
+      return res.status(403).json({ 
+        error: 'LINE login is only available for customers. Admin, Manager, and Staff must use regular login with userId and password.' 
+      });
+    }
+
+    // Generate JWT token
+    const expiresInValue: StringValue = (JWT_EXPIRES_IN as StringValue) || ('7d' as StringValue);
+    const signOptions: SignOptions = {
+      expiresIn: expiresInValue,
+    };
+
+    const token = jwt.sign(
+      { 
+        userId: user.userId,
+        id: user._id.toString(),
+        role: user.role,
+        displayName: user.displayName
+      },
+      JWT_SECRET,
+      signOptions
+    );
+
+    // Return user data and token
+    res.json({
+      token,
+      user: {
+        _id: user._id.toString(),
+        id: user._id.toString(),
+        userId: user.userId,
+        displayName: user.displayName,
+        email: user.email || undefined,
+        phone: user.phone || undefined,
+        role: user.role.toLowerCase(),
+        isActive: user.isActive,
+        pictureUrl: user.pictureUrl || undefined,
+        createdAt: user.createdAt instanceof Date ? user.createdAt.toISOString() : new Date(user.createdAt).toISOString(),
+        updatedAt: user.updatedAt instanceof Date ? user.updatedAt.toISOString() : new Date(user.updatedAt).toISOString(),
+      },
+    });
+  } catch (error: any) {
+    console.error('Error during LINE login callback:', error);
     next(error);
   }
 });

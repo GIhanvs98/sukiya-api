@@ -1,8 +1,137 @@
 import { Router } from 'express';
 import { prisma, getMongoDb } from '../config/database';
 import { ObjectId } from 'mongodb';
+import { sendOrderConfirmation, sendPushMessage } from '../config/line';
+import { generateOrderId } from '../utils/orderId';
+import type { CreateOrderRequest } from '../types';
 
 const router = Router();
+
+// POST /api/orders - Create new order
+router.post('/', async (req, res) => {
+  try {
+    const { userId, displayName, tableNumber, items }: CreateOrderRequest = req.body;
+
+    // Validate required fields
+    if (!userId || !displayName || !tableNumber || !items || items.length === 0) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        missingFields: [
+          !userId ? 'userId' : null,
+          !displayName ? 'displayName' : null,
+          !tableNumber ? 'tableNumber' : null,
+          !items || items.length === 0 ? 'items' : null,
+        ].filter(Boolean),
+      });
+    }
+
+    // Use native MongoDB driver for writes
+    const db = await getMongoDb();
+    const now = new Date();
+    const orderId = generateOrderId();
+
+    // Fetch menu items to get prices and names
+    const itemIds = items.map(item => new ObjectId(item.itemId));
+    const menuItems = await db.collection('menu_items')
+      .find({ _id: { $in: itemIds } })
+      .toArray();
+
+    // Create a map for quick lookup
+    const menuItemsMap = new Map(menuItems.map(item => [item._id.toString(), item]));
+
+    // Calculate total and prepare order items
+    let total = 0;
+    const orderItems = [];
+    const orderObjectId = new ObjectId();
+
+    for (const item of items) {
+      const menuItem = menuItemsMap.get(item.itemId);
+      if (!menuItem) {
+        return res.status(400).json({ error: `Menu item not found: ${item.itemId}` });
+      }
+      if (!menuItem.isActive) {
+        return res.status(400).json({ error: `Menu item is not active: ${item.itemId}` });
+      }
+
+      const itemPrice = menuItem.price * item.quantity;
+      total += itemPrice;
+
+      orderItems.push({
+        _id: new ObjectId(),
+        orderId: orderObjectId,
+        itemId: new ObjectId(item.itemId),
+        name: menuItem.nameEn || menuItem.nameJp,
+        quantity: item.quantity,
+        price: menuItem.price,
+      });
+    }
+
+    // Create order
+    const order = {
+      _id: orderObjectId,
+      orderId: orderId,
+      userId: userId.trim(),
+      displayName: displayName.trim(),
+      tableNumber: tableNumber.trim(),
+      total: total,
+      status: 'Received',
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    // Insert order and order items
+    await db.collection('orders').insertOne(order);
+    if (orderItems.length > 0) {
+      await db.collection('order_items').insertMany(orderItems);
+    }
+
+    // Update user statistics
+    await db.collection('users').updateOne(
+      { userId: userId },
+      {
+        $inc: { totalOrders: 1, totalSpent: total },
+        $set: { lastOrderDate: now, updatedAt: now },
+      }
+    );
+
+    // Send push notification (non-blocking)
+    try {
+      await sendOrderConfirmation(userId, orderId, tableNumber);
+      console.log(`✅ Push notification sent for order ${orderId}`);
+    } catch (pushError: any) {
+      console.warn(`⚠️  Failed to send push notification for order ${orderId}:`, pushError.message);
+      // Don't fail the order creation if push notification fails
+    }
+
+    // Transform to match frontend format
+    const transformedOrder = {
+      _id: order._id.toString(),
+      id: order._id.toString(),
+      orderId: order.orderId,
+      userId: order.userId,
+      displayName: order.displayName,
+      tableNumber: order.tableNumber,
+      items: orderItems.map((item) => ({
+        itemId: item.itemId.toString(),
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+      })),
+      total: order.total,
+      status: order.status,
+      createdAt: order.createdAt.toISOString(),
+      updatedAt: order.updatedAt.toISOString(),
+    };
+
+    res.status(201).json(transformedOrder);
+  } catch (error: any) {
+    console.error('Error creating order:', error);
+    res.status(500).json({
+      error: 'Failed to create order',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    });
+  }
+});
 
 // GET /api/orders - Get all orders
 router.get('/', async (req, res) => {
@@ -131,6 +260,21 @@ router.patch('/:id/status', async (req, res) => {
       createdAt: result.createdAt.toISOString(),
       updatedAt: result.updatedAt.toISOString(),
     };
+
+    // Send push notification when order is ready
+    if (status === 'Ready') {
+      try {
+        const readyMessageEn = `🍱 Your order ${result.orderId} from Table ${result.tableNumber} is ready! Please come to pick it up.`;
+        const readyMessageJp = `🍱 テーブル ${result.tableNumber} のご注文 ${result.orderId} の準備ができました。お受け取りにお越しください。`;
+        const readyMessage = `${readyMessageEn}\n\n${readyMessageJp}`;
+        
+        await sendPushMessage(result.userId, readyMessage);
+        console.log(`✅ Ready notification sent for order ${result.orderId}`);
+      } catch (pushError: any) {
+        console.warn(`⚠️  Failed to send ready notification for order ${result.orderId}:`, pushError.message);
+        // Don't fail the status update if push notification fails
+      }
+    }
 
     res.json(transformedOrder);
   } catch (error: any) {

@@ -62,8 +62,10 @@ export async function getMongoDb(): Promise<Db> {
   
   try {
     mongoClient = new MongoClient(cleanUrl, {
-      serverSelectionTimeoutMS: 5000, // 5 second timeout
-      connectTimeoutMS: 10000, // 10 second connection timeout
+      serverSelectionTimeoutMS: 3000, // 3 second timeout (reduced for serverless)
+      connectTimeoutMS: 5000, // 5 second connection timeout (reduced for serverless)
+      maxPoolSize: 1, // Single connection for serverless
+      minPoolSize: 0, // No minimum pool
     });
     await mongoClient.connect();
     mongoDb = mongoClient.db(dbName);
