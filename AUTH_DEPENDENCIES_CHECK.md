@@ -162,3 +162,10 @@ Before deploying to production:
 - JWT expiration (7d) is reasonable for admin panel ✅
 
 
+
+
+
+
+
+
+
