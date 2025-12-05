@@ -62,7 +62,9 @@ app.use((req, res, next) => {
         'DELETE /api/users/:id',
         'POST /api/auth/login',
         'POST /api/auth/verify',
-        'POST /api/auth/set-password'
+        'POST /api/auth/set-password',
+        'GET /api/auth/line/login',
+        'GET /api/auth/line/callback'
       ]
     });
   }
@@ -138,6 +140,8 @@ async function startServer() {
       console.log(`   POST   /api/auth/login`);
       console.log(`   POST   /api/auth/verify`);
       console.log(`   POST   /api/auth/set-password`);
+      console.log(`   GET    /api/auth/line/login`);
+      console.log(`   GET    /api/auth/line/callback`);
     }).on('error', (error: any) => {
       if (error.code === 'EADDRINUSE') {
         console.error(`❌ Port ${PORT} is already in use.`);
