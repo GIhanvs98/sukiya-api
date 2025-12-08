@@ -7,12 +7,12 @@ const router = Router();
 // GET /api/users - Get all users
 router.get('/', async (req, res) => {
   try {
-    // Get users from database
-    const users = await prisma.user.findMany({
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
+    // Get users from database using raw MongoDB to avoid enum validation issues
+    const db = await getMongoDb();
+    const users = await db.collection('users')
+      .find({})
+      .sort({ createdAt: -1 })
+      .toArray();
 
     // Also aggregate order data to update stats
     const orders = await prisma.order.findMany({
@@ -38,22 +38,27 @@ router.get('/', async (req, res) => {
     });
 
     // Merge user data with stats
-    const usersWithStats = users.map((user) => {
+    const usersWithStats = users.map((user: any) => {
       const stats = userStats.get(user.userId) || { totalOrders: 0, totalSpent: 0 };
+      // Normalize role: convert to proper case (Customer, Staff, Manager, Admin)
+      const normalizedRole = user.role 
+        ? user.role.charAt(0).toUpperCase() + user.role.slice(1).toLowerCase()
+        : 'Customer';
+      
       return {
-        _id: user.id,
-        id: user.id,
+        _id: user._id.toString(),
+        id: user._id.toString(),
         userId: user.userId,
         displayName: user.displayName,
         email: user.email,
         phone: user.phone,
-        role: user.role.toLowerCase() as string,
+        role: normalizedRole.toLowerCase(),
         totalOrders: stats.totalOrders,
         totalSpent: stats.totalSpent,
         lastOrderDate: stats.lastOrderDate?.toISOString(),
-        createdAt: user.createdAt.toISOString(),
-        updatedAt: user.updatedAt.toISOString(),
-        isActive: user.isActive,
+        createdAt: user.createdAt ? new Date(user.createdAt).toISOString() : new Date().toISOString(),
+        updatedAt: user.updatedAt ? new Date(user.updatedAt).toISOString() : new Date().toISOString(),
+        isActive: user.isActive !== undefined ? user.isActive : true,
       };
     });
 
@@ -77,25 +82,30 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { userId },
+    // Check if user already exists using raw MongoDB
+    const db = await getMongoDb();
+    const existingUser = await db.collection('users').findOne({
+      userId: userId.trim()
     });
 
     if (existingUser) {
       return res.status(409).json({ error: 'User with this userId already exists' });
     }
 
-    // Use native MongoDB driver for writes
-    const db = await getMongoDb();
+    // Use native MongoDB driver for writes (db already initialized above)
     const now = new Date();
+    // Normalize role: convert to proper case (Customer, Staff, Manager, Admin)
+    const normalizedRole = role 
+      ? role.charAt(0).toUpperCase() + role.slice(1).toLowerCase()
+      : 'Customer';
+    
     const userData = {
       _id: new ObjectId(),
       userId: userId.trim(),
       displayName: displayName.trim(),
       email: email?.trim() || null,
       phone: phone?.trim() || null,
-      role: role || 'Customer',
+      role: normalizedRole,
       totalOrders: 0,
       totalSpent: 0,
       lastOrderDate: null,
@@ -188,6 +198,11 @@ router.patch('/:id', async (req, res) => {
     const totalSpent = orders.reduce((sum, order) => sum + order.total, 0);
     const lastOrderDate = orders[0]?.createdAt || null;
 
+    // Normalize role: convert to proper case (Customer, Staff, Manager, Admin)
+    const normalizedRole = result.role 
+      ? result.role.charAt(0).toUpperCase() + result.role.slice(1).toLowerCase()
+      : 'Customer';
+
     // Transform to match frontend format
     const user = {
       _id: result._id.toString(),
@@ -196,13 +211,13 @@ router.patch('/:id', async (req, res) => {
       displayName: result.displayName,
       email: result.email,
       phone: result.phone,
-      role: result.role.toLowerCase(),
+      role: normalizedRole.toLowerCase(),
       totalOrders,
       totalSpent,
       lastOrderDate: lastOrderDate?.toISOString(),
-      createdAt: result.createdAt.toISOString(),
-      updatedAt: result.updatedAt.toISOString(),
-      isActive: result.isActive,
+      createdAt: result.createdAt ? new Date(result.createdAt).toISOString() : new Date().toISOString(),
+      updatedAt: result.updatedAt ? new Date(result.updatedAt).toISOString() : new Date().toISOString(),
+      isActive: result.isActive !== undefined ? result.isActive : true,
     };
 
     res.json(user);
@@ -220,8 +235,10 @@ router.get('/userId/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
 
-    const user = await prisma.user.findUnique({
-      where: { userId: userId.trim() },
+    // Use raw MongoDB to avoid enum validation issues
+    const db = await getMongoDb();
+    const user = await db.collection('users').findOne({
+      userId: userId.trim()
     });
 
     if (!user) {
@@ -241,21 +258,26 @@ router.get('/userId/:userId', async (req, res) => {
     const totalSpent = orders.reduce((sum, order) => sum + order.total, 0);
     const lastOrderDate = orders[0]?.createdAt || null;
 
+    // Normalize role: convert to proper case (Customer, Staff, Manager, Admin)
+    const normalizedRole = user.role 
+      ? user.role.charAt(0).toUpperCase() + user.role.slice(1).toLowerCase()
+      : 'Customer';
+
     // Transform to match frontend format
     const userWithStats = {
-      _id: user.id,
-      id: user.id,
+      _id: user._id.toString(),
+      id: user._id.toString(),
       userId: user.userId,
       displayName: user.displayName,
       email: user.email,
       phone: user.phone,
-      role: user.role.toLowerCase(),
+      role: normalizedRole.toLowerCase(),
       totalOrders,
       totalSpent,
       lastOrderDate: lastOrderDate?.toISOString(),
-      createdAt: user.createdAt.toISOString(),
-      updatedAt: user.updatedAt.toISOString(),
-      isActive: user.isActive,
+      createdAt: user.createdAt ? new Date(user.createdAt).toISOString() : new Date().toISOString(),
+      updatedAt: user.updatedAt ? new Date(user.updatedAt).toISOString() : new Date().toISOString(),
+      isActive: user.isActive !== undefined ? user.isActive : true,
     };
 
     res.json(userWithStats);
