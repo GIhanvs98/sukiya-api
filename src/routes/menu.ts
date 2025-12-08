@@ -41,7 +41,7 @@ router.post('/', async (req, res) => {
     console.log('POST /api/menu - Request received');
     console.log('Request body:', JSON.stringify(req.body, null, 2));
     
-    const { nameEn, nameJp, price, imageUrl, category, isActive } = req.body;
+    const { nameEn, nameJp, price, imageUrl, category, subcategory, isActive } = req.body;
 
     // Validate required fields
     if (!nameEn || !nameJp || price === undefined || !imageUrl || !category) {
@@ -76,6 +76,7 @@ router.post('/', async (req, res) => {
       price: parsedPrice,
       imageUrl: imageUrl.trim(),
       category: category.trim(),
+      subcategory: subcategory?.trim() || null,
       isActive: isActive !== undefined ? isActive : true,
       createdAt: now,
       updatedAt: now,
@@ -92,6 +93,7 @@ router.post('/', async (req, res) => {
       price: menuItemData.price,
       imageUrl: menuItemData.imageUrl,
       category: menuItemData.category,
+      subcategory: menuItemData.subcategory,
       isActive: menuItemData.isActive,
       createdAt: menuItemData.createdAt,
       updatedAt: menuItemData.updatedAt,
@@ -231,6 +233,7 @@ router.patch('/:id', async (req, res) => {
       price: result.price,
       imageUrl: result.imageUrl,
       category: result.category,
+      subcategory: result.subcategory || null,
       isActive: result.isActive,
       createdAt: result.createdAt,
       updatedAt: result.updatedAt,
