@@ -33,6 +33,7 @@ export interface MenuItemResponse {
   price: number;
   imageUrl: string;
   category: string;
+  subcategory?: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -44,6 +45,7 @@ export interface CreateMenuItemRequest {
   price: number;
   imageUrl: string;
   category: string;
+  subcategory?: string | null;
   isActive?: boolean;
 }
 
@@ -53,6 +55,7 @@ export interface UpdateMenuItemRequest {
   price?: number;
   imageUrl?: string;
   category?: string;
+  subcategory?: string | null;
   isActive?: boolean;
 }
 
