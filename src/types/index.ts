@@ -6,6 +6,7 @@ export interface CreateOrderRequest {
     itemId: string;
     quantity: number;
   }>;
+  paymentMethod?: 'paypay' | 'manual';
 }
 
 export interface OrderResponse {
@@ -14,6 +15,7 @@ export interface OrderResponse {
   userId: string;
   displayName: string;
   tableNumber: string;
+  paymentMethod?: 'paypay' | 'manual';
   items: Array<{
     itemId: string;
     name: string;
