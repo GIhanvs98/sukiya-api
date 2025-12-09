@@ -15,6 +15,7 @@ export interface OrderResponse {
   userId: string;
   displayName: string;
   tableNumber: string;
+  lineUserId?: string;
   paymentMethod?: 'paypay' | 'manual';
   items: Array<{
     itemId: string;
