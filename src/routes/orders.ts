@@ -30,6 +30,12 @@ router.post('/', async (req, res) => {
     const now = new Date();
     const orderId = generateOrderId();
 
+    // Fetch user to get LINE user ID
+    const user = await db.collection('users').findOne({
+      userId: userId.trim()
+    });
+    const lineUserId = user?.lineUserId || null;
+
     // Fetch menu items to get prices and names
     const itemIds = items.map(item => new ObjectId(item.itemId));
     const menuItems = await db.collection('menu_items')
@@ -73,6 +79,7 @@ router.post('/', async (req, res) => {
       userId: userId.trim(),
       displayName: displayName.trim(),
       tableNumber: tableNumber.trim(),
+      lineUserId: lineUserId, // Store LINE user ID if available
       total: total,
       paymentMethod: paymentMethod || 'manual', // Default to manual if not specified
       status: 'Received',
@@ -112,6 +119,7 @@ router.post('/', async (req, res) => {
       userId: order.userId,
       displayName: order.displayName,
       tableNumber: order.tableNumber,
+      lineUserId: order.lineUserId || undefined,
       paymentMethod: order.paymentMethod,
       items: orderItems.map((item) => ({
         itemId: item.itemId.toString(),
@@ -182,6 +190,7 @@ router.get('/', async (req, res) => {
         userId: order.userId,
         displayName: order.displayName,
         tableNumber: order.tableNumber,
+        lineUserId: order.lineUserId || undefined,
         paymentMethod: order.paymentMethod || 'manual',
         items: items,
         total: order.total,
@@ -252,6 +261,7 @@ router.patch('/:id/status', async (req, res) => {
       userId: result.userId,
       displayName: result.displayName,
       tableNumber: result.tableNumber,
+      lineUserId: result.lineUserId || undefined,
       paymentMethod: result.paymentMethod || 'manual',
       items: orderItems.map((item) => ({
         itemId: item.itemId.toString(),
