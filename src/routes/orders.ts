@@ -10,7 +10,7 @@ const router = Router();
 // POST /api/orders - Create new order
 router.post('/', async (req, res) => {
   try {
-    const { userId, displayName, tableNumber, items }: CreateOrderRequest = req.body;
+    const { userId, displayName, tableNumber, items, paymentMethod }: CreateOrderRequest = req.body;
 
     // Validate required fields
     if (!userId || !displayName || !tableNumber || !items || items.length === 0) {
@@ -74,6 +74,7 @@ router.post('/', async (req, res) => {
       displayName: displayName.trim(),
       tableNumber: tableNumber.trim(),
       total: total,
+      paymentMethod: paymentMethod || 'manual', // Default to manual if not specified
       status: 'Received',
       createdAt: now,
       updatedAt: now,
@@ -111,6 +112,7 @@ router.post('/', async (req, res) => {
       userId: order.userId,
       displayName: order.displayName,
       tableNumber: order.tableNumber,
+      paymentMethod: order.paymentMethod,
       items: orderItems.map((item) => ({
         itemId: item.itemId.toString(),
         name: item.name,
@@ -180,6 +182,7 @@ router.get('/', async (req, res) => {
         userId: order.userId,
         displayName: order.displayName,
         tableNumber: order.tableNumber,
+        paymentMethod: order.paymentMethod || 'manual',
         items: items,
         total: order.total,
         status: order.status,
@@ -249,6 +252,7 @@ router.patch('/:id/status', async (req, res) => {
       userId: result.userId,
       displayName: result.displayName,
       tableNumber: result.tableNumber,
+      paymentMethod: result.paymentMethod || 'manual',
       items: orderItems.map((item) => ({
         itemId: item.itemId.toString(),
         name: item.name,
