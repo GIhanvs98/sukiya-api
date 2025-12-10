@@ -11,21 +11,31 @@ router.get('/', async (req, res) => {
     const authHeader = req.headers.authorization;
     const isAdminRequest = authHeader && authHeader.startsWith('Bearer ');
 
+    // Use native MongoDB driver for reads to ensure all fields are included (including isAddon)
+    const db = await getMongoDb();
+    
     // For admin requests, return all items. For public requests, return only active items.
-    const whereClause = isAdminRequest ? {} : { isActive: true };
+    const query = isAdminRequest ? {} : { isActive: true };
 
-    const menuItems = await prisma.menuItem.findMany({
-      where: whereClause,
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
+    const menuItems = await db.collection('menu_items')
+      .find(query)
+      .sort({ createdAt: -1 })
+      .toArray();
 
-    // Normalize response to include _id field (Prisma uses 'id' by default)
+    // Normalize response to match Prisma format
     const normalizedItems = menuItems.map((item: any) => ({
-      ...item,
-      _id: item.id || item._id,
-      id: item.id || item._id,
+      id: item._id.toString(),
+      _id: item._id.toString(),
+      nameEn: item.nameEn,
+      nameJp: item.nameJp,
+      price: item.price,
+      imageUrl: item.imageUrl,
+      category: item.category,
+      subcategory: item.subcategory || null,
+      isActive: item.isActive !== undefined ? item.isActive : true,
+      isAddon: item.isAddon !== undefined ? item.isAddon : false,
+      createdAt: item.createdAt instanceof Date ? item.createdAt.toISOString() : new Date(item.createdAt).toISOString(),
+      updatedAt: item.updatedAt instanceof Date ? item.updatedAt.toISOString() : new Date(item.updatedAt).toISOString(),
     }));
 
     res.json(normalizedItems);
@@ -41,7 +51,7 @@ router.post('/', async (req, res) => {
     console.log('POST /api/menu - Request received');
     console.log('Request body:', JSON.stringify(req.body, null, 2));
     
-    const { nameEn, nameJp, price, imageUrl, category, subcategory, isActive } = req.body;
+    const { nameEn, nameJp, price, imageUrl, category, subcategory, isActive, isAddon } = req.body;
 
     // Validate required fields
     if (!nameEn || !nameJp || price === undefined || !imageUrl || !category) {
@@ -78,6 +88,7 @@ router.post('/', async (req, res) => {
       category: category.trim(),
       subcategory: subcategory?.trim() || null,
       isActive: isActive !== undefined ? isActive : true,
+      isAddon: isAddon !== undefined ? isAddon : false,
       createdAt: now,
       updatedAt: now,
     };
@@ -95,6 +106,7 @@ router.post('/', async (req, res) => {
       category: menuItemData.category,
       subcategory: menuItemData.subcategory,
       isActive: menuItemData.isActive,
+      isAddon: menuItemData.isAddon,
       createdAt: menuItemData.createdAt,
       updatedAt: menuItemData.updatedAt,
     };
@@ -235,6 +247,7 @@ router.patch('/:id', async (req, res) => {
       category: result.category,
       subcategory: result.subcategory || null,
       isActive: result.isActive,
+      isAddon: result.isAddon || false,
       createdAt: result.createdAt,
       updatedAt: result.updatedAt,
     };
@@ -269,6 +282,43 @@ router.delete('/:id', async (req, res) => {
   } catch (error: any) {
     console.error('Error deleting menu item:', error);
     res.status(500).json({ error: 'Failed to delete menu item' });
+  }
+});
+
+// GET /api/menu/addons - Get addon-eligible menu items
+router.get('/addons', async (req, res) => {
+  try {
+    // Use native MongoDB driver to fetch addon-eligible items
+    const db = await getMongoDb();
+    
+    const addonItems = await db.collection('menu_items')
+      .find({
+        isAddon: true,
+        isActive: true,
+      })
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    // Normalize response to match Prisma format
+    const normalizedItems = addonItems.map((item: any) => ({
+      id: item._id.toString(),
+      _id: item._id.toString(),
+      nameEn: item.nameEn,
+      nameJp: item.nameJp,
+      price: item.price,
+      imageUrl: item.imageUrl,
+      category: item.category,
+      subcategory: item.subcategory || null,
+      isActive: item.isActive !== undefined ? item.isActive : true,
+      isAddon: item.isAddon !== undefined ? item.isAddon : false,
+      createdAt: item.createdAt instanceof Date ? item.createdAt.toISOString() : new Date(item.createdAt).toISOString(),
+      updatedAt: item.updatedAt instanceof Date ? item.updatedAt.toISOString() : new Date(item.updatedAt).toISOString(),
+    }));
+
+    res.json(normalizedItems);
+  } catch (error) {
+    console.error('Error fetching addon items:', error);
+    res.status(500).json({ error: 'Failed to fetch addon items' });
   }
 });
 
