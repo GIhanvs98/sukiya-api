@@ -16,6 +16,7 @@ model MenuItem {
   category      String
   subcategory   String?
   isActive      Boolean  @default(true)
+  isAddon       Boolean  @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -44,14 +45,15 @@ model Order {
 }
 
 model OrderItem {
-  id       String   @id @default(auto()) @map("_id") @db.ObjectId
-  orderId String   @db.ObjectId
-  order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  itemId  String   @db.ObjectId
-  item    MenuItem @relation(fields: [itemId], references: [id])
-  name    String
-  quantity Int
-  price   Float
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  orderId     String   @db.ObjectId
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  itemId      String   @db.ObjectId
+  item        MenuItem @relation(fields: [itemId], references: [id])
+  name        String
+  quantity    Int
+  price       Float
+  parentItemId String? @db.ObjectId
 
   @@map("order_items")
 }
