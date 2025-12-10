@@ -36,10 +36,18 @@ router.post('/', async (req, res) => {
     });
     const lineUserId = user?.lineUserId || null;
 
+    // Collect all item IDs (main items + addons)
+    const allItemIds = new Set<string>();
+    items.forEach(item => {
+      allItemIds.add(item.itemId);
+      if (item.addons) {
+        item.addons.forEach(addon => allItemIds.add(addon.itemId));
+      }
+    });
+
     // Fetch menu items to get prices and names
-    const itemIds = items.map(item => new ObjectId(item.itemId));
     const menuItems = await db.collection('menu_items')
-      .find({ _id: { $in: itemIds } })
+      .find({ _id: { $in: Array.from(allItemIds).map(id => new ObjectId(id)) } })
       .toArray();
 
     // Create a map for quick lookup
@@ -62,14 +70,46 @@ router.post('/', async (req, res) => {
       const itemPrice = menuItem.price * item.quantity;
       total += itemPrice;
 
+      // Add main item
+      const mainItemId = new ObjectId();
       orderItems.push({
-        _id: new ObjectId(),
+        _id: mainItemId,
         orderId: orderObjectId,
         itemId: new ObjectId(item.itemId),
         name: menuItem.nameEn || menuItem.nameJp,
         quantity: item.quantity,
         price: menuItem.price,
+        parentItemId: null, // Main items have no parent
       });
+
+      // Add addons if any
+      if (item.addons && item.addons.length > 0) {
+        for (const addon of item.addons) {
+          const addonMenuItem = menuItemsMap.get(addon.itemId);
+          if (!addonMenuItem) {
+            return res.status(400).json({ error: `Addon menu item not found: ${addon.itemId}` });
+          }
+          if (!addonMenuItem.isActive) {
+            return res.status(400).json({ error: `Addon menu item is not active: ${addon.itemId}` });
+          }
+          if (!addonMenuItem.isAddon) {
+            return res.status(400).json({ error: `Item ${addon.itemId} is not marked as an addon` });
+          }
+
+          const addonPrice = addonMenuItem.price * addon.quantity;
+          total += addonPrice;
+
+          orderItems.push({
+            _id: new ObjectId(),
+            orderId: orderObjectId,
+            itemId: new ObjectId(addon.itemId),
+            name: addonMenuItem.nameEn || addonMenuItem.nameJp,
+            quantity: addon.quantity,
+            price: addonMenuItem.price,
+            parentItemId: mainItemId, // Link addon to parent item
+          });
+        }
+      }
     }
 
     // Create order
@@ -126,6 +166,7 @@ router.post('/', async (req, res) => {
         name: item.name,
         quantity: item.quantity,
         price: item.price,
+        parentItemId: item.parentItemId ? item.parentItemId.toString() : undefined,
       })),
       total: order.total,
       status: order.status,
@@ -181,6 +222,7 @@ router.get('/', async (req, res) => {
         name: item.name,
         quantity: item.quantity,
         price: item.price,
+        parentItemId: item.parentItemId ? item.parentItemId.toString() : undefined,
       }));
 
       return {
@@ -268,6 +310,7 @@ router.patch('/:id/status', async (req, res) => {
         name: item.name,
         quantity: item.quantity,
         price: item.price,
+        parentItemId: item.parentItemId ? item.parentItemId.toString() : undefined,
       })),
       total: result.total,
       status: result.status,
