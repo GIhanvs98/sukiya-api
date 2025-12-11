@@ -34,6 +34,7 @@ router.get('/', async (req, res) => {
       subcategory: item.subcategory || null,
       isActive: item.isActive !== undefined ? item.isActive : true,
       isAddon: item.isAddon !== undefined ? item.isAddon : false,
+      allowedAddons: item.allowedAddons || [],
       createdAt: item.createdAt instanceof Date ? item.createdAt.toISOString() : new Date(item.createdAt).toISOString(),
       updatedAt: item.updatedAt instanceof Date ? item.updatedAt.toISOString() : new Date(item.updatedAt).toISOString(),
     }));
@@ -51,7 +52,7 @@ router.post('/', async (req, res) => {
     console.log('POST /api/menu - Request received');
     console.log('Request body:', JSON.stringify(req.body, null, 2));
     
-    const { nameEn, nameJp, price, imageUrl, category, subcategory, isActive, isAddon } = req.body;
+    const { nameEn, nameJp, price, imageUrl, category, subcategory, isActive, isAddon, allowedAddons } = req.body;
 
     // Validate required fields
     if (!nameEn || !nameJp || price === undefined || !imageUrl || !category) {
@@ -89,6 +90,7 @@ router.post('/', async (req, res) => {
       subcategory: subcategory?.trim() || null,
       isActive: isActive !== undefined ? isActive : true,
       isAddon: isAddon !== undefined ? isAddon : false,
+      allowedAddons: Array.isArray(allowedAddons) ? allowedAddons : [],
       createdAt: now,
       updatedAt: now,
     };
@@ -107,6 +109,7 @@ router.post('/', async (req, res) => {
       subcategory: menuItemData.subcategory,
       isActive: menuItemData.isActive,
       isAddon: menuItemData.isAddon,
+      allowedAddons: menuItemData.allowedAddons,
       createdAt: menuItemData.createdAt,
       updatedAt: menuItemData.updatedAt,
     };
@@ -248,6 +251,7 @@ router.patch('/:id', async (req, res) => {
       subcategory: result.subcategory || null,
       isActive: result.isActive,
       isAddon: result.isAddon || false,
+      allowedAddons: result.allowedAddons || [],
       createdAt: result.createdAt,
       updatedAt: result.updatedAt,
     };
@@ -285,19 +289,63 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// GET /api/menu/addons - Get addon-eligible menu items
+// GET /api/menu/addons - Get addon-eligible menu items for a specific parent item
 router.get('/addons', async (req, res) => {
   try {
+    const { parentItemId } = req.query;
+    
     // Use native MongoDB driver to fetch addon-eligible items
     const db = await getMongoDb();
     
-    const addonItems = await db.collection('menu_items')
-      .find({
-        isAddon: true,
-        isActive: true,
-      })
-      .sort({ createdAt: -1 })
-      .toArray();
+    let addonItems;
+    
+    if (parentItemId) {
+      // Get the parent menu item to check its allowedAddons
+      const parentItem = await db.collection('menu_items')
+        .findOne({ _id: new ObjectId(parentItemId as string) });
+      
+      if (!parentItem) {
+        return res.status(404).json({ error: 'Parent menu item not found' });
+      }
+      
+      // If parent item has allowedAddons defined, only return those addons
+      // Otherwise, return all addons (backward compatibility)
+      const allowedAddonIds = parentItem.allowedAddons || [];
+      
+      if (allowedAddonIds.length > 0) {
+        // Convert string IDs to ObjectIds for query
+        const allowedObjectIds = allowedAddonIds
+          .filter((id: string) => ObjectId.isValid(id))
+          .map((id: string) => new ObjectId(id));
+        
+        addonItems = await db.collection('menu_items')
+          .find({
+            _id: { $in: allowedObjectIds },
+            isAddon: true,
+            isActive: true,
+          })
+          .sort({ createdAt: -1 })
+          .toArray();
+      } else {
+        // No restrictions - return all addons (backward compatibility)
+        addonItems = await db.collection('menu_items')
+          .find({
+            isAddon: true,
+            isActive: true,
+          })
+          .sort({ createdAt: -1 })
+          .toArray();
+      }
+    } else {
+      // No parent item specified - return all addons (backward compatibility)
+      addonItems = await db.collection('menu_items')
+        .find({
+          isAddon: true,
+          isActive: true,
+        })
+        .sort({ createdAt: -1 })
+        .toArray();
+    }
 
     // Normalize response to match Prisma format
     const normalizedItems = addonItems.map((item: any) => ({

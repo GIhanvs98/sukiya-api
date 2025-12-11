@@ -17,6 +17,7 @@ model MenuItem {
   subcategory   String?
   isActive      Boolean  @default(true)
   isAddon       Boolean  @default(false)
+  allowedAddons String[] @default([]) // Array of addon IDs that can be added to this item
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

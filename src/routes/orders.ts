@@ -84,6 +84,9 @@ router.post('/', async (req, res) => {
 
       // Add addons if any
       if (item.addons && item.addons.length > 0) {
+        // Get parent item's allowedAddons
+        const parentAllowedAddons = menuItem.allowedAddons || [];
+        
         for (const addon of item.addons) {
           const addonMenuItem = menuItemsMap.get(addon.itemId);
           if (!addonMenuItem) {
@@ -94,6 +97,13 @@ router.post('/', async (req, res) => {
           }
           if (!addonMenuItem.isAddon) {
             return res.status(400).json({ error: `Item ${addon.itemId} is not marked as an addon` });
+          }
+          
+          // Check if addon is allowed for this parent item
+          if (parentAllowedAddons.length > 0 && !parentAllowedAddons.includes(addon.itemId)) {
+            return res.status(400).json({ 
+              error: `Addon ${addon.itemId} is not allowed for menu item ${item.itemId}` 
+            });
           }
 
           const addonPrice = addonMenuItem.price * addon.quantity;

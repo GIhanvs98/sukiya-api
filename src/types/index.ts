@@ -44,6 +44,7 @@ export interface MenuItemResponse {
   subcategory?: string | null;
   isActive: boolean;
   isAddon?: boolean;
+  allowedAddons?: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -57,6 +58,7 @@ export interface CreateMenuItemRequest {
   subcategory?: string | null;
   isActive?: boolean;
   isAddon?: boolean;
+  allowedAddons?: string[];
 }
 
 export interface UpdateMenuItemRequest {
@@ -68,6 +70,7 @@ export interface UpdateMenuItemRequest {
   subcategory?: string | null;
   isActive?: boolean;
   isAddon?: boolean;
+  allowedAddons?: string[];
 }
 
 export interface UpdateOrderStatusRequest {
