@@ -21,6 +21,7 @@ export interface OrderResponse {
   tableNumber: string;
   lineUserId?: string;
   paymentMethod?: 'paypay' | 'manual';
+  paymentStatus?: 'pending' | 'paid' | null;
   items: Array<{
     itemId: string;
     name: string;

@@ -123,6 +123,10 @@ router.post('/', async (req, res) => {
     }
 
     // Create order
+    // Payment status: 'pending' for paypay (pay after), 'paid' for immediate payment, null for manual
+    const paymentStatus = paymentMethod === 'paypay' ? 'pending' : 
+                         paymentMethod === 'manual' ? null : 'pending';
+    
     const order = {
       _id: orderObjectId,
       orderId: orderId,
@@ -132,6 +136,7 @@ router.post('/', async (req, res) => {
       lineUserId: lineUserId, // Store LINE user ID if available
       total: total,
       paymentMethod: paymentMethod || 'manual', // Default to manual if not specified
+      paymentStatus: paymentStatus, // 'pending' | 'paid' | null
       status: 'Received',
       createdAt: now,
       updatedAt: now,
@@ -171,6 +176,7 @@ router.post('/', async (req, res) => {
       tableNumber: order.tableNumber,
       lineUserId: order.lineUserId || undefined,
       paymentMethod: order.paymentMethod,
+      paymentStatus: order.paymentStatus || null,
       items: orderItems.map((item) => ({
         itemId: item.itemId.toString(),
         name: item.name,
@@ -244,6 +250,141 @@ router.get('/', async (req, res) => {
         tableNumber: order.tableNumber,
         lineUserId: order.lineUserId || undefined,
         paymentMethod: order.paymentMethod || 'manual',
+        paymentStatus: order.paymentStatus || null,
+        items: items,
+        total: order.total,
+        status: order.status,
+        createdAt: order.createdAt instanceof Date ? order.createdAt.toISOString() : new Date(order.createdAt).toISOString(),
+        updatedAt: order.updatedAt instanceof Date ? order.updatedAt.toISOString() : new Date(order.updatedAt).toISOString(),
+      };
+    });
+
+    res.json(transformedOrders);
+  } catch (error: any) {
+    console.error('Error fetching orders:', error);
+    console.error('Error details:', {
+      message: error?.message,
+      code: error?.code,
+      name: error?.name,
+    });
+    res.status(500).json({ 
+      error: 'Failed to fetch orders',
+      details: process.env.NODE_ENV === 'development' ? error?.message : undefined
+    });
+  }
+});
+
+// GET /api/orders/:orderId - Get single order by orderId
+router.get('/:orderId', async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    
+    if (!orderId || orderId.trim() === '') {
+      return res.status(400).json({ error: 'Order ID is required' });
+    }
+    
+    // Use native MongoDB driver
+    const db = await getMongoDb();
+    
+    // Find order by orderId (not _id)
+    const order = await db.collection('orders').findOne({
+      orderId: orderId
+    });
+
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    // Fetch order items
+    const orderItems = await db.collection('order_items')
+      .find({ orderId: order._id })
+      .toArray();
+
+    // Transform to match frontend format
+    const transformedOrder = {
+      _id: order._id.toString(),
+      id: order._id.toString(),
+      orderId: order.orderId,
+      userId: order.userId,
+      displayName: order.displayName,
+      tableNumber: order.tableNumber,
+      lineUserId: order.lineUserId || undefined,
+      paymentMethod: order.paymentMethod || 'manual',
+      paymentStatus: order.paymentStatus || null,
+      items: orderItems.map((item) => ({
+        itemId: item.itemId.toString(),
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+        parentItemId: item.parentItemId ? item.parentItemId.toString() : undefined,
+      })),
+      total: order.total,
+      status: order.status,
+      createdAt: order.createdAt instanceof Date ? order.createdAt.toISOString() : new Date(order.createdAt).toISOString(),
+      updatedAt: order.updatedAt instanceof Date ? order.updatedAt.toISOString() : new Date(order.updatedAt).toISOString(),
+    };
+
+    res.json(transformedOrder);
+  } catch (error: any) {
+    console.error('Error fetching order:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch order',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// GET /api/orders - Get all orders
+router.get('/', async (req, res) => {
+  try {
+    // Use native MongoDB driver for more reliable querying
+    const db = await getMongoDb();
+    
+    // Fetch orders
+    const orders = await db.collection('orders')
+      .find({})
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    // Fetch all order items
+    const orderItemsMap = new Map();
+    if (orders.length > 0) {
+      const orderIds = orders.map(order => order._id);
+      const orderItems = await db.collection('order_items')
+        .find({ orderId: { $in: orderIds } })
+        .toArray();
+      
+      // Group items by orderId
+      orderItems.forEach(item => {
+        const orderIdStr = item.orderId.toString();
+        if (!orderItemsMap.has(orderIdStr)) {
+          orderItemsMap.set(orderIdStr, []);
+        }
+        orderItemsMap.get(orderIdStr).push(item);
+      });
+    }
+
+    // Transform to match frontend format
+    const transformedOrders = orders.map((order) => {
+      const orderIdStr = order._id.toString();
+      const items = (orderItemsMap.get(orderIdStr) || []).map((item: any) => ({
+        itemId: item.itemId.toString(),
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+        parentItemId: item.parentItemId ? item.parentItemId.toString() : undefined,
+      }));
+
+      return {
+        _id: order._id.toString(),
+        id: order._id.toString(),
+        orderId: order.orderId,
+        userId: order.userId,
+        displayName: order.displayName,
+        tableNumber: order.tableNumber,
+        lineUserId: order.lineUserId || undefined,
+        paymentMethod: order.paymentMethod || 'manual',
+        paymentStatus: order.paymentStatus || null,
         items: items,
         total: order.total,
         status: order.status,
@@ -313,9 +454,10 @@ router.patch('/:id/status', async (req, res) => {
       userId: result.userId,
       displayName: result.displayName,
       tableNumber: result.tableNumber,
-      lineUserId: result.lineUserId || undefined,
-      paymentMethod: result.paymentMethod || 'manual',
-      items: orderItems.map((item) => ({
+        lineUserId: result.lineUserId || undefined,
+        paymentMethod: result.paymentMethod || 'manual',
+        paymentStatus: result.paymentStatus || null,
+        items: orderItems.map((item) => ({
         itemId: item.itemId.toString(),
         name: item.name,
         quantity: item.quantity,
@@ -348,6 +490,78 @@ router.patch('/:id/status', async (req, res) => {
     console.error('Error updating order status:', error);
     res.status(500).json({ 
       error: 'Failed to update order status',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// PATCH /api/orders/:id/payment - Process payment for an order
+router.patch('/:id/payment', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { paymentStatus } = req.body;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid order ID format' });
+    }
+
+    if (!paymentStatus || !['pending', 'paid'].includes(paymentStatus)) {
+      return res.status(400).json({ error: 'Invalid payment status. Must be "pending" or "paid"' });
+    }
+
+    // Use native MongoDB driver for writes
+    const db = await getMongoDb();
+    const orderObjectId = new ObjectId(id);
+    
+    const result = await db.collection('orders').findOneAndUpdate(
+      { _id: orderObjectId },
+      { 
+        $set: { 
+          paymentStatus: paymentStatus,
+          updatedAt: new Date()
+        } 
+      },
+      { returnDocument: 'after' }
+    );
+
+    if (!result) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    // Fetch order items using native MongoDB driver
+    const orderItems = await db.collection('order_items').find({
+      orderId: orderObjectId
+    }).toArray();
+
+    // Transform to match frontend format
+    const transformedOrder = {
+      _id: result._id.toString(),
+      id: result._id.toString(),
+      orderId: result.orderId,
+      userId: result.userId,
+      displayName: result.displayName,
+      tableNumber: result.tableNumber,
+      lineUserId: result.lineUserId || undefined,
+      paymentMethod: result.paymentMethod || 'manual',
+      paymentStatus: result.paymentStatus || null,
+      items: orderItems.map((item) => ({
+        itemId: item.itemId.toString(),
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+        parentItemId: item.parentItemId ? item.parentItemId.toString() : undefined,
+      })),
+      total: result.total,
+      status: result.status,
+      createdAt: result.createdAt.toISOString(),
+      updatedAt: result.updatedAt.toISOString(),
+    };
+
+    res.json(transformedOrder);
+  } catch (error: any) {
+    console.error('Error processing payment:', error);
+    res.status(500).json({ 
+      error: 'Failed to process payment',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
