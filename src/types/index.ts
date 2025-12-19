@@ -5,7 +5,12 @@ export interface CreateOrderRequest {
   items: Array<{
     itemId: string;
     quantity: number;
+    addons?: Array<{
+      itemId: string;
+      quantity: number;
+    }>;
   }>;
+  paymentMethod?: 'paypay' | 'manual';
 }
 
 export interface OrderResponse {
@@ -14,11 +19,15 @@ export interface OrderResponse {
   userId: string;
   displayName: string;
   tableNumber: string;
+  lineUserId?: string;
+  paymentMethod?: 'paypay' | 'manual';
+  paymentStatus?: 'pending' | 'paid' | null;
   items: Array<{
     itemId: string;
     name: string;
     quantity: number;
     price: number;
+    parentItemId?: string;
   }>;
   total: number;
   status: 'Received' | 'Preparing' | 'Ready' | 'Completed';
@@ -33,7 +42,10 @@ export interface MenuItemResponse {
   price: number;
   imageUrl: string;
   category: string;
+  subcategory?: string | null;
   isActive: boolean;
+  isAddon?: boolean;
+  allowedAddons?: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -44,7 +56,10 @@ export interface CreateMenuItemRequest {
   price: number;
   imageUrl: string;
   category: string;
+  subcategory?: string | null;
   isActive?: boolean;
+  isAddon?: boolean;
+  allowedAddons?: string[];
 }
 
 export interface UpdateMenuItemRequest {
@@ -53,7 +68,10 @@ export interface UpdateMenuItemRequest {
   price?: number;
   imageUrl?: string;
   category?: string;
+  subcategory?: string | null;
   isActive?: boolean;
+  isAddon?: boolean;
+  allowedAddons?: string[];
 }
 
 export interface UpdateOrderStatusRequest {
