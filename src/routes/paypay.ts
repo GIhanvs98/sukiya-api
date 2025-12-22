@@ -1,10 +1,12 @@
 import { Router } from 'express';
+import { getMongoDb } from '../config/database';
+import paypayService from '../config/paypay';
 
 const router = Router();
 
 // GET /api/paypay/qr/:orderId
-// Generates a QR that points to the frontend payment page for this order.
-// The frontend base URL can be configured via FRONTEND_BASE_URL (.env).
+// Generates a PayPay Dynamic QR code for the order payment.
+// If PayPay API is not configured, falls back to generating a QR code that points to the payment page.
 router.get('/qr/:orderId', async (req, res) => {
   try {
     const { orderId } = req.params;
@@ -12,6 +14,53 @@ router.get('/qr/:orderId', async (req, res) => {
       return res.status(400).json({ error: 'orderId is required' });
     }
 
+    // Try to use PayPay API if configured
+    if (paypayService.isConfigured()) {
+      try {
+        // Fetch order details from database
+        const db = await getMongoDb();
+        const order = await db.collection('orders').findOne({
+          orderId: orderId,
+        });
+
+        if (!order) {
+          return res.status(404).json({ error: 'Order not found' });
+        }
+
+        // Check if order is already paid
+        if (order.paymentStatus === 'paid') {
+          return res.status(400).json({ 
+            error: 'Order is already paid',
+            paymentStatus: 'paid',
+          });
+        }
+
+        // Create PayPay QR code
+        // Use orderId as merchantPaymentId (must be unique)
+        const { qrCodeURL, codeId } = await paypayService.createQRCode(
+          orderId, // merchantPaymentId
+          order.total, // amount
+          'JPY', // currency
+          `Order ${orderId} - Table ${order.tableNumber}` // order description
+        );
+
+        return res.json({
+          orderId,
+          qrUrl: qrCodeURL,
+          codeId,
+          amount: order.total,
+          currency: 'JPY',
+          provider: 'paypay',
+        });
+      } catch (paypayError: any) {
+        console.error('PayPay API error:', paypayError);
+        // Fall through to fallback method if PayPay API fails
+        // This allows the system to still work even if PayPay API has issues
+      }
+    }
+
+    // Fallback: Generate QR code that points to payment page
+    // This is used when PayPay API is not configured or fails
     const frontendBase = process.env.FRONTEND_BASE_URL || 'http://localhost:3000';
     const normalizedBase = frontendBase.endsWith('/') ? frontendBase.slice(0, -1) : frontendBase;
     const paymentUrl = `${normalizedBase}/payment/${encodeURIComponent(orderId)}`;
@@ -24,6 +73,9 @@ router.get('/qr/:orderId', async (req, res) => {
       paymentUrl,
       qrUrl,
       provider: 'qrserver.com',
+      note: paypayService.isConfigured() 
+        ? 'PayPay API failed, using fallback QR code' 
+        : 'PayPay API not configured, using fallback QR code',
     });
   } catch (error: any) {
     console.error('Error generating PayPay QR:', error);
