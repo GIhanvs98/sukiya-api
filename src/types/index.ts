@@ -10,7 +10,7 @@ export interface CreateOrderRequest {
       quantity: number;
     }>;
   }>;
-  paymentMethod?: 'paypay' | 'manual';
+  paymentMethod?: 'paypay' | 'manual' | 'paypay_now' | 'paypay_after';
 }
 
 export interface OrderResponse {

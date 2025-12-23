@@ -67,6 +67,8 @@ app.use((req, res, next) => {
         'POST /api/auth/verify',
         'POST /api/auth/set-password',
         'GET /api/auth/line/login',
+        'GET /api/auth/qr/:tableId',
+        'POST /api/auth/table',
         'GET /api/auth/line/callback'
       ]
     });

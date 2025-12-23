@@ -501,5 +501,295 @@ router.get('/line/callback', async (req, res, next) => {
   }
 });
 
+// POST /api/auth/liff - Handle LIFF authentication (LINE app)
+// This endpoint receives LINE profile data directly from LIFF (no OAuth flow needed)
+router.post('/liff', async (req, res, next) => {
+  try {
+    const { userId, displayName, pictureUrl } = req.body;
+
+    // Validate required fields
+    if (!userId) {
+      return res.status(400).json({ error: 'LINE user ID is required' });
+    }
+
+    if (!displayName) {
+      return res.status(400).json({ error: 'Display name is required' });
+    }
+
+    // Get MongoDB connection
+    let db;
+    try {
+      db = await getMongoDb();
+    } catch (dbError: any) {
+      console.error('Database connection error during LIFF login:', dbError);
+      return res.status(503).json({ 
+        error: 'Database connection failed',
+        details: process.env.NODE_ENV === 'development' ? dbError.message : undefined
+      });
+    }
+
+    // Find or create user by LINE user ID
+    let user = await db.collection('users').findOne({
+      lineUserId: userId
+    });
+
+    if (!user) {
+      // Create new user with LINE login
+      const newUser = {
+        userId: `line_${userId.substring(0, 12)}`, // Generate a userId from LINE ID
+        lineUserId: userId,
+        displayName: displayName,
+        pictureUrl: pictureUrl || undefined,
+        role: 'customer',
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        totalOrders: 0,
+        totalSpent: 0,
+      };
+
+      const insertResult = await db.collection('users').insertOne(newUser);
+      user = { ...newUser, _id: insertResult.insertedId };
+    } else {
+      // Update existing user's LINE info
+      await db.collection('users').updateOne(
+        { _id: user._id },
+        {
+          $set: {
+            displayName: displayName,
+            pictureUrl: pictureUrl || user.pictureUrl,
+            updatedAt: new Date(),
+          }
+        }
+      );
+      
+      // Refresh user data
+      user = await db.collection('users').findOne({
+        _id: user._id
+      });
+    }
+
+    // Check if user exists (should always exist at this point, but TypeScript needs this check)
+    if (!user) {
+      return res.status(500).json({ error: 'Failed to create or retrieve user' });
+    }
+
+    // Check if user is active
+    if (!user.isActive) {
+      return res.status(401).json({ error: 'Account is inactive' });
+    }
+
+    // LIFF login is only allowed for customers
+    // Admin, Manager, and Staff must use regular userId/password login
+    const userRole = user.role?.toString().toLowerCase();
+    if (userRole !== 'customer') {
+      return res.status(403).json({ 
+        error: 'LIFF login is only available for customers. Admin, Manager, and Staff must use regular login with userId and password.' 
+      });
+    }
+
+    // Generate JWT token
+    const expiresInValue: StringValue = (JWT_EXPIRES_IN as StringValue) || ('7d' as StringValue);
+    const signOptions: SignOptions = {
+      expiresIn: expiresInValue,
+    };
+
+    const token = jwt.sign(
+      { 
+        userId: user.userId,
+        id: user._id.toString(),
+        role: user.role,
+        displayName: user.displayName
+      },
+      JWT_SECRET,
+      signOptions
+    );
+
+    // Return user data and token
+    res.json({
+      token,
+      user: {
+        _id: user._id.toString(),
+        id: user._id.toString(),
+        userId: user.userId,
+        displayName: user.displayName,
+        email: user.email || undefined,
+        phone: user.phone || undefined,
+        role: user.role.toLowerCase(),
+        isActive: user.isActive,
+        pictureUrl: user.pictureUrl || undefined,
+        lineUserId: user.lineUserId || undefined,
+        createdAt: user.createdAt instanceof Date ? user.createdAt.toISOString() : new Date(user.createdAt).toISOString(),
+        updatedAt: user.updatedAt instanceof Date ? user.updatedAt.toISOString() : new Date(user.updatedAt).toISOString(),
+      },
+    });
+  } catch (error: any) {
+    console.error('Error during LIFF authentication:', error);
+    next(error);
+  }
+});
+
+// POST /api/auth/table - Login with table ID (for restaurant customers)
+router.post('/table', async (req, res, next) => {
+  try {
+    const { tableId } = req.body;
+
+    // Validate required fields
+    if (!tableId) {
+      return res.status(400).json({ error: 'Table ID is required' });
+    }
+
+    const tableIdTrimmed = tableId.trim();
+    if (!tableIdTrimmed) {
+      return res.status(400).json({ error: 'Table ID cannot be empty' });
+    }
+
+    // Get MongoDB connection
+    let db;
+    try {
+      db = await getMongoDb();
+    } catch (dbError: any) {
+      console.error('Database connection error during table login:', dbError);
+      return res.status(503).json({ 
+        error: 'Database connection failed',
+        details: process.env.NODE_ENV === 'development' ? dbError.message : undefined
+      });
+    }
+
+    // Find or create user by table ID
+    // Table ID format: table_<tableNumber>
+    const tableUserId = `table_${tableIdTrimmed}`;
+    
+    let user = await db.collection('users').findOne({
+      userId: tableUserId
+    });
+
+    if (!user) {
+      // Create new user for this table
+      const newUser = {
+        userId: tableUserId,
+        displayName: `Table ${tableIdTrimmed}`,
+        role: 'customer',
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        totalOrders: 0,
+        totalSpent: 0,
+      };
+
+      const insertResult = await db.collection('users').insertOne(newUser);
+      user = { ...newUser, _id: insertResult.insertedId };
+    } else {
+      // Check if user is active
+      if (!user.isActive) {
+        return res.status(401).json({ error: 'Account is inactive' });
+      }
+
+      // Update last access time
+      await db.collection('users').updateOne(
+        { _id: user._id },
+        {
+          $set: {
+            updatedAt: new Date(),
+          }
+        }
+      );
+      
+      // Refresh user data
+      user = await db.collection('users').findOne({
+        _id: user._id
+      });
+    }
+
+    // Check if user exists (should always exist at this point, but TypeScript needs this check)
+    if (!user) {
+      return res.status(500).json({ error: 'Failed to create or retrieve user' });
+    }
+
+    // Table login is only allowed for customers
+    const userRole = user.role?.toString().toLowerCase();
+    if (userRole !== 'customer') {
+      return res.status(403).json({ 
+        error: 'Table login is only available for customers.' 
+      });
+    }
+
+    // Generate JWT token
+    const expiresInValue: StringValue = (JWT_EXPIRES_IN as StringValue) || ('7d' as StringValue);
+    const signOptions: SignOptions = {
+      expiresIn: expiresInValue,
+    };
+
+    const token = jwt.sign(
+      { 
+        userId: user.userId,
+        id: user._id.toString(),
+        role: user.role,
+        displayName: user.displayName,
+        tableId: tableIdTrimmed, // Include table ID in token for easy access
+      },
+      JWT_SECRET,
+      signOptions
+    );
+
+    // Return user data and token
+    res.json({
+      token,
+      user: {
+        _id: user._id.toString(),
+        id: user._id.toString(),
+        userId: user.userId,
+        displayName: user.displayName,
+        email: user.email || undefined,
+        phone: user.phone || undefined,
+        role: user.role.toLowerCase(),
+        isActive: user.isActive,
+        tableId: tableIdTrimmed,
+        createdAt: user.createdAt instanceof Date ? user.createdAt.toISOString() : new Date(user.createdAt).toISOString(),
+        updatedAt: user.updatedAt instanceof Date ? user.updatedAt.toISOString() : new Date(user.updatedAt).toISOString(),
+      },
+    });
+  } catch (error: any) {
+    console.error('Error during table login:', error);
+    next(error);
+  }
+});
+
+// GET /api/auth/qr/:tableId - Generate QR code URL for table login
+router.get('/qr/:tableId', async (req, res, next) => {
+  try {
+    const { tableId } = req.params;
+
+    if (!tableId) {
+      return res.status(400).json({ error: 'Table ID is required' });
+    }
+
+    const tableIdTrimmed = tableId.trim();
+    if (!tableIdTrimmed) {
+      return res.status(400).json({ error: 'Table ID cannot be empty' });
+    }
+
+    // Get frontend base URL
+    const frontendBase = process.env.FRONTEND_BASE_URL || 'http://localhost:3000';
+    const normalizedBase = frontendBase.endsWith('/') ? frontendBase.slice(0, -1) : frontendBase;
+    
+    // Create login URL with table ID
+    const loginUrl = `${normalizedBase}/login/qr?tableId=${encodeURIComponent(tableIdTrimmed)}`;
+
+    // Generate QR code image URL
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(loginUrl)}`;
+
+    res.json({
+      tableId: tableIdTrimmed,
+      loginUrl,
+      qrUrl,
+      provider: 'qrserver.com',
+    });
+  } catch (error: any) {
+    console.error('Error generating table login QR code:', error);
+    next(error);
+  }
+});
+
 export default router;
 
