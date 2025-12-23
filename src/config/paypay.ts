@@ -115,7 +115,7 @@ class PayPayService {
         throw new Error(`PayPay OAuth failed: ${response.status} - ${errorText}`);
       }
 
-      const tokenData: PayPayAccessToken = await response.json();
+      const tokenData = await response.json() as PayPayAccessToken;
       
       // Calculate expiry timestamp
       tokenData.expires_at = Math.floor(Date.now() / 1000) + (tokenData.expires_in || 3600);
@@ -170,7 +170,7 @@ class PayPayService {
         body: JSON.stringify(requestBody),
       });
 
-      const responseData: PayPayQRCodeResponse = await response.json();
+      const responseData = await response.json() as PayPayQRCodeResponse;
 
       if (!response.ok || responseData.resultInfo.code !== 'SUCCESS') {
         const errorMessage = responseData.resultInfo.message || `PayPay API error: ${response.status}`;
