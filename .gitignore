@@ -22,6 +22,7 @@ yarn-error.log*
 *.swp
 *.swo
 *~
+.cursorignore
 
 # OS
 .DS_Store
@@ -31,3 +32,6 @@ Thumbs.db
 prisma/migrations/
 .vercel
 .env*.local
+
+# Documentation
+*.md

@@ -123,9 +123,23 @@ router.post('/', async (req, res) => {
     }
 
     // Create order
-    // Payment status: 'pending' for paypay (pay after), 'paid' for immediate payment, null for manual
-    const paymentStatus = paymentMethod === 'paypay' ? 'pending' : 
-                         paymentMethod === 'manual' ? null : 'pending';
+    // Payment status: 'paid' for paypay_now, 'pending' for paypay_after or paypay (legacy), null for manual
+    let finalPaymentMethod = paymentMethod || 'manual';
+    let paymentStatus: 'pending' | 'paid' | null;
+    
+    if (finalPaymentMethod === 'paypay_now') {
+      paymentStatus = 'paid';
+      finalPaymentMethod = 'paypay';
+    } else if (finalPaymentMethod === 'paypay_after') {
+      paymentStatus = 'pending';
+      finalPaymentMethod = 'paypay';
+    } else if (finalPaymentMethod === 'paypay') {
+      // Legacy support: default to 'pending' for paypay
+      paymentStatus = 'pending';
+    } else {
+      // manual
+      paymentStatus = null;
+    }
     
     const order = {
       _id: orderObjectId,
@@ -135,7 +149,7 @@ router.post('/', async (req, res) => {
       tableNumber: tableNumber.trim(),
       lineUserId: lineUserId, // Store LINE user ID if available
       total: total,
-      paymentMethod: paymentMethod || 'manual', // Default to manual if not specified
+      paymentMethod: finalPaymentMethod, // 'paypay' or 'manual'
       paymentStatus: paymentStatus, // 'pending' | 'paid' | null
       status: 'Received',
       createdAt: now,

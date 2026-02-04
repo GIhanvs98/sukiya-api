@@ -7,6 +7,7 @@ import menuRoutes from './routes/menu';
 import orderRoutes from './routes/orders';
 import userRoutes from './routes/users';
 import authRoutes from './routes/auth';
+import paypayRoutes from './routes/paypay';
 
 dotenv.config();
 
@@ -39,6 +40,7 @@ app.use('/api/menu', menuRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/paypay', paypayRoutes);
 
 // 404 handler for API routes (must be after all routes, before error handler)
 // Fixed for Vercel: Use middleware pattern instead of /api/* to avoid breaking Vercel routing
@@ -56,6 +58,7 @@ app.use((req, res, next) => {
         'DELETE /api/menu/:id',
         'GET /api/orders',
         'PATCH /api/orders/:id/status',
+        'GET /api/paypay/qr/:orderId',
         'GET /api/users',
         'POST /api/users',
         'PATCH /api/users/:id',
@@ -64,6 +67,8 @@ app.use((req, res, next) => {
         'POST /api/auth/verify',
         'POST /api/auth/set-password',
         'GET /api/auth/line/login',
+        'GET /api/auth/qr/:tableId',
+        'POST /api/auth/table',
         'GET /api/auth/line/callback'
       ]
     });
@@ -133,6 +138,7 @@ async function startServer() {
       console.log(`   DELETE /api/menu/:id`);
       console.log(`   GET    /api/orders`);
       console.log(`   PATCH  /api/orders/:id/status`);
+      console.log(`   GET    /api/paypay/qr/:orderId`);
       console.log(`   GET    /api/users`);
       console.log(`   POST   /api/users`);
       console.log(`   PATCH  /api/users/:id`);
